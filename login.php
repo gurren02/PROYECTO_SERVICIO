@@ -11,11 +11,11 @@
 <body>
     <div class="contenedor_login-fondo">
         <div class="contenedor_login">
+            <h3 class="login-titulo">Iniciar sesión</h3>
             <div class="login-imagen">
                 <img src="multimedia/logologin.png" alt="loginlogo" class="imagen_log">
             </div>
             <div class="login-credenciales">
-                <h3 class="login-titulo">Login</h3>
                 <form action="" method="post" id="credenciales" class="credenciales-login">
                     <legend class="titulo-credenciales">Usuario</legend>
                     <input type="text" class="elementologin" placeholder="Usuario" name=userlog" required>

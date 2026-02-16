@@ -20,20 +20,33 @@ body{
 .centrar{
     text-align: center;
 }
+/*COLORES Y ELEMENTOS*/
+/*
+#12534d
+ */
 /*ESTILOS PARA EL LOGIN*/
 .contenedor_login{
     max-width: 350px;
     margin: auto;
     margin-top: 5%;
     padding: 30px 20px;
-    background-color: aqua;
     border-radius:20px;
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow:
+            0 15px 40px rgba(0, 0, 0, 0.25),
+            inset 0 0 25px rgba(255, 255, 255, 0.2);
 }
 .login-imagen{
     text-align: center;
 }
 .imagen_log{
     max-width: 200px;
+}
+.login-titulo{
+    text-align: center;
+    margin: 20px;
 }
 .credenciales-login {
     display: flex;
@@ -48,6 +61,9 @@ body{
     width: 100%;
     box-sizing: border-box;
 }
+.titulo-credenciales{
+    padding: 5px;
+}
 .btn_login{
     padding: 10px;
     border-radius: 5px;
@@ -55,4 +71,16 @@ body{
     width: 100%;
     box-sizing: border-box;
     text-align: center;
+    background-color: rgb(0, 193, 90);
+    backdrop-filter: blur(40px);
+    color: #ffffff;
+}
+/*ESTILOS PARA EL HEADER*/
+.contenedor_header{
+    background-color: #12534d;
+    padding: 10px;
+}
+.logo-header{
+    max-width: 75px;
+    margin-left: 50px;
 }
