@@ -1,0 +1,58 @@
+*{
+    margin: 0px;
+    padding: 0px;
+    box-sizing: border-box;
+}
+body{
+    font-family: Helvetica;
+    font-size: 16px;
+    line-height: 24px;
+    color:#000000;
+    background-color: #ffffff;
+}
+.margen{
+    padding: 10px;
+}
+.ancho{
+    max-width: 1200px;
+    margin: auto;
+}
+.centrar{
+    text-align: center;
+}
+/*ESTILOS PARA EL LOGIN*/
+.contenedor_login{
+    max-width: 350px;
+    margin: auto;
+    margin-top: 5%;
+    padding: 30px 20px;
+    background-color: aqua;
+    border-radius:20px;
+}
+.login-imagen{
+    text-align: center;
+}
+.imagen_log{
+    max-width: 200px;
+}
+.credenciales-login {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 100%;
+}
+.elementologin{
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    width: 100%;
+    box-sizing: border-box;
+}
+.btn_login{
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+}
