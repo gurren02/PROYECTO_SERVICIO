@@ -7,7 +7,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <link rel="stylesheet" href="estilos.css">
     <script src="script.js"></script>
-    <title>SEGUIMIENTO ANOMALIAS</title>
+    <title>SUBIR</title>
 </head>
 <body>
     <header>
@@ -19,6 +19,9 @@
         ?>
     </header>
     <main>
+        <div class="contenedor_sub-padre">
+            <h2>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Amet animi assumenda ea eaque illo inventore ipsum neque numquam odit praesentium quam quis, sed sint? Excepturi incidunt laudantium magnam optio quas./h2>
+        </div>
     </main>
 </body>
 </html>
