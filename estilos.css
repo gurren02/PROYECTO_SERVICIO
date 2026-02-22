@@ -1,83 +1,212 @@
-*{
+* {
     margin: 0px;
     padding: 0px;
     box-sizing: border-box;
 }
-body{
+
+body {
     font-family: Helvetica;
     font-size: 16px;
     line-height: 24px;
-    color:#000000;
-    background-color: #12534d;
+    color: #000000;
+    background-color: #ffffff;
 }
-.margen{
+
+.margen {
     padding: 10px;
 }
-.ancho{
+
+.ancho {
     max-width: 1200px;
     margin: auto;
 }
-.centrar{
+
+.centrar {
     text-align: center;
 }
+
 /*COLORES Y ELEMENTOS*/
 /*
 #12534d
 #00C15AFF
  */
 /*ESTILOS PARA EL LOGIN*/
-.contenedor_login{
-    max-width: 350px;
-    margin: auto;
-    margin-top: 5%;
-    padding: 30px 20px;
-    border-radius:20px;
-    background: rgba(255, 255, 255, 0.18);
-    backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow:
-            0 15px 40px rgba(0, 0, 0, 0.25),
-            inset 0 0 25px rgba(255, 255, 255, 0.2);
+.login-page-wrapper {
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Sans', sans-serif;
+
+    /* IMAGEN DE FONDO */
+    background-image: url('multimedia/fondo_login.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    position: relative;
 }
-.login-imagen{
-    text-align: center;
+
+/* Oscurecimiento para que el cristal resalte mejor */
+.login-page-wrapper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 0;
 }
-.imagen_log{
-    max-width: 200px;
+
+.contenedor_login-fondo {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 2rem;
 }
-.login-titulo{
-    text-align: center;
-    margin: 20px;
-}
-.credenciales-login {
+
+/* EFECTO LIQUID CRYSTAL / GLASSMORPHISM */
+.contenedor_login {
+    background: rgba(255, 255, 255, 0.1); /* Blanco muy translúcido */
+    backdrop-filter: blur(20px) saturate(160%); /* El desenfoque crea el efecto cristal */
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+
+    /* Borde que simula el filo del vidrio */
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 24px;
+
+    padding: 3rem 2.5rem;
+    width: 100%;
+    max-width: 420px;
+
+    /* Sombra suave para despegarlo del fondo */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    align-items: center;
+    color: white;
+}
+
+.login-titulo {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.5px;
+}
+
+.login-imagen {
+    margin-bottom: 1.5rem;
+}
+
+.imagen_log {
+    width: 75px;
+    height: 75px;
+    border-radius: 15px;
+}
+
+.login-credenciales {
     width: 100%;
 }
-.elementologin{
-    padding: 10px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
+
+.titulo-credenciales {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 0.5rem;
+    margin-top: 1rem;
+    font-weight: 500;
+}
+
+.input-wrapper {
+    position: relative;
     width: 100%;
-    box-sizing: border-box;
 }
-.titulo-credenciales{
-    padding: 5px;
-}
-.btn_login{
-    padding: 10px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
+
+.elementologin {
     width: 100%;
-    box-sizing: border-box;
-    text-align: center;
-    background-color: #00C15AFF;
-    backdrop-filter: blur(40px);
-    color: #ffffff;
+    padding: 14px 14px 14px 45px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: white;
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.3s ease;
 }
+
+.input-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.elementologin:focus {
+    background: rgba(0, 193, 90, 0.18);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.row-extras {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin: 1.5rem 0;
+    font-size: 0.85rem;
+}
+
+.remember-label {
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.link-forgot {
+    background: none;
+    border: none;
+    color: white;
+    text-decoration: underline;
+    cursor: pointer;
+    font-family: inherit;
+    opacity: 0.8;
+}
+
+/* Botón sólido para contraste */
+.btn_login {
+    width: 100%;
+    padding: 16px;
+    background: white;
+    border: none;
+    border-radius: 12px;
+    color: #111;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn_login:hover {
+    background: rgba(255, 255, 255, 0.9);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.register-link {
+    margin-top: 2rem;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.register-link a {
+    color: white;
+    text-decoration: none;
+    font-weight: 600;
+}
+
 /*ESTILOS PARA EL HEADER*/
-.contenedor_header{
+.contenedor_header {
     background-color: #12534d;
     padding: 25px 15px;
     display: flex;
@@ -88,10 +217,12 @@ body{
     right: 0;
     z-index: 100;
 }
+
 .logo-header {
     max-width: 75px;
     margin-left: 50px;
 }
+
 /*ESTILOS PARA EL MENU*/
 .menu-toggle span {
     display: block;
@@ -100,6 +231,7 @@ body{
     background-color: #ffffff;
     margin: 5px 0;
 }
+
 .menu-toggle {
     background: none;
     border: none;
@@ -107,6 +239,7 @@ body{
     padding: 8px;
     margin-right: 16px;
 }
+
 .sidebar {
     position: fixed;
     left: 0;
@@ -118,9 +251,11 @@ body{
     border-right: 1px solid #e5e5e5;
     border: none;
 }
+
 .sidebar.expanded {
     width: 240px;
 }
+
 .menu-item {
     display: flex;
     flex-direction: column;
@@ -130,35 +265,43 @@ body{
     color: #333;
     cursor: pointer;
 }
+
 .sidebar.expanded .menu-item {
     flex-direction: row;
     padding: 12px 24px;
     align-items: center;
 }
+
 .menu-item:hover {
     background-color: #00C15AFF;
 }
+
 .menu-icon {
     width: 24px;
     height: 24px;
     margin-bottom: 6px;
 }
+
 .sidebar.expanded .menu-icon {
     margin-bottom: 0;
     margin-right: 24px;
 }
+
 .menu-text {
     font-size: 10px;
     text-align: center;
     color: #ffffff;
 }
+
 .sidebar.expanded .menu-text {
     font-size: 14px;
     text-align: left;
 }
+
 .sidebar.expanded ~ main {
     margin-left: 240px;
 }
+
 /*AJUSTES DEL MAIN*/
 main {
     margin-top: 90px;
@@ -167,6 +310,7 @@ main {
     background-color: #ffffff;
     border-top-left-radius: 20px;
 }
+
 .sidebar.expanded ~ main {
     margin-left: 240px;
 }

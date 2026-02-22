@@ -3,17 +3,13 @@
         <img src="multimedia/home.svg" alt="INICIO" class="menu-icon">
         <div class="menu-text">INICIO</div>
     </a>
-    <a href="sub.php" class="menu-item">
+    <a href="subir.php" class="menu-item">
         <img src="multimedia/sub.svg" alt="SUBIR" class="menu-icon">
         <div class="menu-text">SUBIR</div>
     </a>
-    <a href="#" class="menu-item">
+    <a href="tablas.php" class="menu-item">
         <img src="multimedia/tabla.svg" alt="TABLAS" class="menu-icon">
         <div class="menu-text">TABLAS</div>
-    </a>
-    <a href="#" class="menu-item">
-        <img src="multimedia/mod.svg" alt="MODIFICAR" class="menu-icon">
-        <div class="menu-text">MODIFICAR</div>
     </a>
     <a href="#" class="menu-item">
         <img src="multimedia/cal.svg" alt="CALCULAR" class="menu-icon">
