@@ -1,0 +1,429 @@
+/* ============================================================
+   ejecutar_analisis.css  —  Reporte nivel agencia — CFE
+   ============================================================ */
+
+:root {
+    --ea-primary:     #1a7a5e;
+    --ea-primary-dk:  #145e49;
+    --ea-primary-lt:  #e8f5f1;
+    --ea-text:        #1e2b27;
+    --ea-muted:       #6b7c78;
+    --ea-border:      #d6e0dd;
+    --ea-card:        #ffffff;
+    --ea-radius:      10px;
+    --ea-radius-sm:   6px;
+    --ea-shadow:      0 2px 16px rgba(0,0,0,0.07);
+    --ea-font:        'Segoe UI', system-ui, sans-serif;
+
+    /* Colores de periodos */
+    --ea-actual-bg:   #c8b800;
+    --ea-actual-text: #3d3600;
+    --ea-bim-bg:      #2563a8;
+    --ea-bim-text:    #ffffff;
+    --ea-ano-bg:      #3a7d1e;
+    --ea-ano-text:    #ffffff;
+
+    --ea-danger:      #b03030;
+    --ea-danger-dk:   #8f1f1f;
+}
+
+/* ---------- Layout ---------- */
+.ea-main {
+    padding: 28px 24px;
+    font-family: var(--ea-font);
+    color: var(--ea-text);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* ---------- Encabezado de página ---------- */
+.ea-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.ea-page-header__left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.ea-page-title {
+    margin: 0 0 3px;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--ea-text);
+    letter-spacing: -0.01em;
+}
+
+.ea-page-subtitle {
+    margin: 0;
+    font-size: 0.86rem;
+    color: var(--ea-muted);
+}
+
+.ea-btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--ea-radius-sm);
+    background: transparent;
+    border: 1px solid var(--ea-border);
+    color: var(--ea-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background .18s, color .18s, border-color .18s;
+}
+.ea-btn-back .material-symbols-rounded { font-size: 18px; }
+.ea-btn-back:hover {
+    background: var(--ea-primary-lt);
+    color: var(--ea-primary);
+    border-color: rgba(26,122,94,.3);
+}
+
+.ea-btn-print {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 20px;
+    background: var(--ea-text);
+    color: #fff;
+    border: none;
+    border-radius: var(--ea-radius-sm);
+    font-family: var(--ea-font);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .18s, transform .1s;
+}
+.ea-btn-print .material-symbols-rounded { font-size: 18px; }
+.ea-btn-print:hover  { background: #2e3d38; }
+.ea-btn-print:active { transform: scale(.97); }
+
+/* ---------- Card base ---------- */
+.ea-card {
+    background: var(--ea-card);
+    border-radius: var(--ea-radius);
+    box-shadow: var(--ea-shadow);
+    overflow: hidden;
+    border: 1px solid #eaf0ed;
+}
+
+.ea-card__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 18px;
+    background: var(--ea-primary);
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    flex-wrap: wrap;
+}
+.ea-card__header .material-symbols-rounded {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+/* Variantes de header por periodo */
+.ea-card__header--actual       { background: var(--ea-actual-bg); color: var(--ea-actual-text); }
+.ea-card__header--bimestre     { background: var(--ea-bim-bg);    color: var(--ea-bim-text); }
+.ea-card__header--ano_anterior { background: var(--ea-ano-bg);    color: var(--ea-ano-text); }
+
+/* Badge de periodo en el header */
+.ea-period-badge {
+    margin-left: auto;
+    padding: 2px 12px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 1px solid rgba(255,255,255,.35);
+    background: rgba(255,255,255,.18);
+    color: inherit;
+    white-space: nowrap;
+}
+.ea-card__header--actual .ea-period-badge {
+    background: rgba(0,0,0,.12);
+    border-color: rgba(0,0,0,.20);
+}
+
+/* ---------- Filtros ---------- */
+.ea-card__body { padding: 16px 18px; }
+
+.ea-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.ea-form__group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.ea-form__label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--ea-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.ea-form__label .material-symbols-rounded { font-size: 14px; }
+
+.ea-form__control {
+    height: 38px;
+    width: 110px;
+    padding: 0 10px;
+    border: 1px solid var(--ea-border);
+    border-radius: var(--ea-radius-sm);
+    font-family: var(--ea-font);
+    font-size: 0.9rem;
+    color: var(--ea-text);
+    background: #fff;
+    outline: none;
+    transition: border-color .18s, box-shadow .18s;
+}
+.ea-form__control:focus {
+    border-color: var(--ea-primary);
+    box-shadow: 0 0 0 3px rgba(26,122,94,.12);
+}
+.ea-form__control::placeholder { color: #b8c5c1; }
+
+.ea-filter-tags {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+.ea-tag {
+    background: rgba(255,255,255,.22);
+    color: #fff;
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border: 1px solid rgba(255,255,255,.30);
+}
+
+.ea-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 16px;
+    border: none;
+    border-radius: var(--ea-radius-sm);
+    font-family: var(--ea-font);
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background .18s, transform .1s;
+    white-space: nowrap;
+}
+.ea-btn .material-symbols-rounded { font-size: 17px; }
+.ea-btn--primary { background: var(--ea-primary); color: #fff; }
+.ea-btn--primary:hover { background: var(--ea-primary-dk); }
+.ea-btn--danger  { background: var(--ea-danger);   color: #fff; }
+.ea-btn--danger:hover  { background: var(--ea-danger-dk); }
+.ea-btn:active { transform: scale(.97); }
+
+/* ============================================================
+   TABLA — layout fixed para alineación perfecta
+   ============================================================ */
+.ea-table-wrapper { overflow-x: auto; }
+
+.ea-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    font-family: var(--ea-font);
+    /* table-layout fixed: columnas con ancho definido, sin desalineación */
+    table-layout: fixed;
+}
+
+/* Variante para tablas con muchas columnas (detalles) */
+.ea-table--detailed {
+    table-layout: auto !important;
+    width: max-content;
+    min-width: 100%;
+}
+.ea-table--detailed th, 
+.ea-table--detailed td {
+    width: auto !important;
+    white-space: nowrap !important;
+    text-overflow: unset !important;
+    overflow: visible !important;
+    text-align: left !important;
+}
+
+/* Encabezados de columna */
+.ea-table__head-cols th {
+    padding: 10px 10px;
+    text-align: right;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    border-bottom: 2px solid var(--ea-border);
+    color: var(--ea-muted);
+    background: #f5f8f6;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Anchos fijos de columnas */
+.ea-th-agencia {
+    text-align: left !important;
+    width: 120px;
+}
+.ea-table th:nth-child(2),
+.ea-table th:nth-child(3),
+.ea-table th:nth-child(4),
+.ea-table th:nth-child(5),
+.ea-table th:nth-child(6),
+.ea-table th:nth-child(7),
+.ea-table th:nth-child(8) { width: 11%; }
+
+.ea-th-defecto {
+    background: #e8eeed !important;
+    color: var(--ea-text) !important;
+    font-weight: 800 !important;
+    text-align: center !important;
+    width: 90px;
+}
+
+/* Filas */
+.ea-table tbody tr {
+    border-bottom: 1px solid #eef2f0;
+    transition: background .13s;
+}
+.ea-table tbody tr:last-child { border-bottom: none; }
+.ea-table tbody tr:hover      { background: var(--ea-primary-lt); }
+
+/* Celda agencia */
+.ea-td-agencia {
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--ea-text);
+    text-align: left;
+    padding: 9px 12px;
+    background: #fafcfb;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-right: 1px solid var(--ea-border);
+}
+
+/* Celdas numéricas */
+.ea-td-num {
+    text-align: right;
+    padding: 9px 12px;
+    color: var(--ea-muted);
+    font-variant-numeric: tabular-nums;
+}
+.ea-td-num--val {
+    color: var(--ea-text);
+    font-weight: 600;
+}
+.ea-zero { color: #c8d5d2; }
+
+/* Celda defecto */
+.ea-td-defecto {
+    text-align: right;
+    padding: 9px 12px;
+    font-weight: 700;
+    background: #f0f4f2;
+    color: var(--ea-text);
+    border-left: 1px solid var(--ea-border);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Fila TOTAL */
+.ea-tr-total td {
+    font-weight: 700;
+    background: #e8eeed !important;
+    color: var(--ea-text);
+    border-top: 2px solid var(--ea-border);
+}
+.ea-tr-total .ea-td-agencia { background: #dce6e2 !important; }
+.ea-tr-total .ea-td-defecto { background: #d4dfdb !important; }
+
+/* ============================================================
+   PRINT — landscape, sin overflow, cada tabla en su página
+   ============================================================ */
+@media print {
+    @page { size: A4 landscape; margin: 10mm 8mm; }
+
+    header,
+    .ea-page-header,
+    .ea-filters-card { display: none !important; }
+
+    .ea-main {
+        padding: 0;
+        gap: 10mm;
+    }
+
+    /* Cada tarjeta empieza en página nueva excepto la primera */
+    .ea-table-card + .ea-table-card { page-break-before: always; }
+
+    .ea-card {
+        box-shadow: none;
+        border: 1px solid #bbb;
+        border-radius: 0;
+    }
+
+    .ea-card__header {
+        padding: 8px 12px;
+        font-size: 0.78rem;
+        border-radius: 0;
+    }
+
+    .ea-period-badge { display: none; }
+
+    /* Tabla compacta que cabe en A4 landscape */
+    .ea-table-wrapper { overflow: visible; }
+
+    .ea-table {
+        font-size: 0.68rem;
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    .ea-table__head-cols th {
+        padding: 6px 6px;
+        font-size: 0.62rem;
+    }
+
+    .ea-th-agencia { width: 90px !important; }
+    .ea-th-defecto { width: 70px !important; }
+
+    .ea-td-agencia,
+    .ea-td-num,
+    .ea-td-defecto { padding: 5px 6px; }
+
+    * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 640px) {
+    .ea-main            { padding: 14px 10px; }
+    .ea-page-header     { flex-direction: column; }
+    .ea-page-header__left { flex-wrap: wrap; }
+}

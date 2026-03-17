@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # 1. TU SERVIDOR WEB (PHP + Apache)
+  web:
+    build: .
+    ports:
+      - "8080:80" # Tu app estará en http://localhost:8080 (para no chocar con el puerto 80 de XAMPP)
+    volumes:
+      - .:/var/www/html # Sincroniza tu carpeta actual con el contenedor en tiempo real
+    depends_on:
+      - db # Espera a que la base de datos encienda primero
+
+  # 2. TU SERVIDOR DE BASE DE DATOS (MySQL)
+  db:
+    image: mysql:8.0
+    ports:
+      - "3307:3306" # MySQL estará en el puerto 3307 (para no chocar con el 3306 de XAMPP)
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes" # Permite contraseña vacía, igual que tu XAMPP
+      MYSQL_DATABASE: "anomalias"       # Crea tu BD automáticamente
+    volumes:
+      - db_data:/var/lib/mysql # Guarda los datos para que no se borren si apagas Docker
+
+volumes:
+  db_data: # Define el disco duro virtual para la BD

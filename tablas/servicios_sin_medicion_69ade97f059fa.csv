@@ -1,0 +1,7 @@
+Fecha_Ade,Rpu,Ciclo,Division,Zona,Agencia,Poblacion,Ruta,Nombre,Tarifa,Estado_Servicio,Conectores_Medidor,Num_Med,Status_Med,Hilos,Cod_Med,Cod_Lot,Tipo_Ade,Kwh,Importe,Lectura,Consumo,Anom_Accion,Anom_Inform,Anom_Sistema,Censo_Fecha,Numero_Lamparas,Desc_Anom_Accion,Desc_Anom_Inform,Desc_Anom_Sistema,Fecha_Lectura_Kavi,Num_Tarea_Kavi,Tipo_Tarea_Kavi,RPE_Lectura_Kavi,Medidor_Kavi,Kwh_Kavi,Modo_Captura_Kavi,Cve_Anom_Kavi,Desc_Anom_Kavi,Validacion_Kavi,Tiene_Foto_Kavi,Proceso
+2025-12-01 00:00:00,771011200407,80,DW,01,B,01,801,MUNICIPIO DE MERIDA YUCATAN   ,03,ACTIVO,0,,,2,,,1,10476,47291,,,,,,2024-12-26,32,,,,,,,,,,,,,,,PLAN
+2025-12-01 00:00:00,771011200563,80,DW,01,B,01,801,MUNICIPIO DE MERIDA YUCATAN   ,03,ACTIVO,0,,,2,,,1,10683,48523,,,,,,2024-12-26,43,,,,,,,,,,,,,,,PLAN
+2025-12-01 00:00:00,779251200863,83,DW,01,M,24,132,INCHAUSTEGUI GALLARDO CLAUDIA ,77,ACTIVO,0,8ECF63 ,01,3,KL28,25NJ,1,934,3979,,,,,,,,,,,,,,,,,,,,,,GSC
+2025-12-01 00:00:00,796190602141,80,DW,06,A,23,001,MUNICIPIO DE OTHON P BLANCO   ,1B,ACTIVO,0,,,2,,,1,207,370,,,,,,,,,,,,,,,,,,,,,,PLAN
+2025-12-01 00:00:00,796190501123,80,DW,06,A,23,001,MUNICIPIO DE OTHON P  BLANCO  ,1B,ACTIVO,0,,,2,,,1,8953,37512,,,,,,,,,,,,,,,,,,,,,,PLAN
+2025-12-01 00:00:00,775971101476,80,DW,01,G,01,001,H  AYUNTAMIENTO DE PROGRESO   ,03,ACTIVO,0,,,2,,,1,11458,51881,,,,,,2024-12-27,50,,,,,,,,,,,,,,,PLAN

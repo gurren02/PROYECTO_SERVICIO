@@ -1,0 +1,680 @@
+* {
+    margin: 0px;
+    padding: 0px;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Helvetica;
+    font-size: 16px;
+    line-height: 24px;
+    color: #000000;
+    background-color: #ECECEC;
+}
+
+.margen {
+    padding: 10px;
+}
+
+.ancho {
+    max-width: 1200px;
+    margin: auto;
+}
+
+.centrar {
+    text-align: center;
+}
+
+/*COLORES Y ELEMENTOS*/
+/*
+#12534d
+#00C15AFF
+ */
+
+/*AJUSTES DEL MAIN*/
+/* Estado CERRADO por defecto (ancho sidebar 72px + 16px offset + espacio) */
+main {
+    margin-top: 90px;
+    margin-left: 100px;
+    padding: 20px;
+    border-top-left-radius: 20px;
+    background-color: #ECECEC;
+    /* La transición debe tener el mismo timing que el menú para que se muevan juntos */
+    transition: margin-left 0.30s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Estado ABIERTO (ancho sidebar 220px + 16px offset + espacio) */
+body.con-sidebar-abierto main {
+    margin-left: 256px;
+}
+/* ============================================================
+   header.css — Estilos exclusivos del componente header
+   Estética: Liquid Crystal / Glassmorphism sobre fondo claro
+   ============================================================ */
+
+/* ---------- Contenedor principal del header ---------- */
+.contenedor_header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 24px;
+    height: 64px;
+
+    /* Liquid crystal: fondo semitransparente + blur */
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(18px) saturate(1.6);
+    -webkit-backdrop-filter: blur(18px) saturate(1.6);
+
+    /* Borde inferior sutil */
+    border-bottom: 1px solid rgba(26, 122, 94, 0.12);
+
+    /* Brillo interior (reflejo de cristal) */
+    box-shadow:
+            0 1px 0 rgba(255,255,255,0.9) inset,
+            0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* ---------- Botón hamburguesa (menu-toggle) ---------- */
+.menu-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #1a7a5e;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+    flex-shrink: 0;
+}
+
+.menu-toggle:hover {
+    background: rgba(26, 122, 94, 0.10);
+    color: #145e49;
+}
+
+.menu-toggle .material-symbols-rounded {
+    font-size: 26px;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ---------- Logo como enlace ---------- */
+.header-logo-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    flex: 1;                  /* Empuja el botón de usuario a la derecha */
+    margin-left: 60px;
+}
+
+.header-logo-link:focus-visible {
+    outline: 2px solid #1a7a5e;
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+.logo-header {
+    height: 36px;
+    width: auto;
+    display: block;
+    transition: opacity 0.18s;
+}
+
+.header-logo-link:hover .logo-header {
+    opacity: 0.82;
+}
+
+/* ---------- Área de usuario ---------- */
+.header-user {
+    position: relative;
+    flex-shrink: 0;
+}
+
+/* Botón circular del icono de usuario */
+.header-user__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1.5px solid rgba(26, 122, 94, 0.30);
+    border-radius: 50%;
+    background: rgba(26, 122, 94, 0.07);
+    color: #1a7a5e;
+    cursor: pointer;
+    transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
+}
+
+.header-user__btn:hover {
+    background: rgba(26, 122, 94, 0.14);
+    border-color: rgba(26, 122, 94, 0.55);
+    box-shadow: 0 0 0 4px rgba(26, 122, 94, 0.08);
+}
+
+.header-user__icon {
+    font-size: 24px;
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ---------- Dropdown emergente ---------- */
+.header-user__dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 230px;
+
+    /* Liquid crystal igual al header */
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(20px) saturate(1.8);
+    -webkit-backdrop-filter: blur(20px) saturate(1.8);
+
+    border: 1px solid rgba(26, 122, 94, 0.15);
+    border-radius: 12px;
+    box-shadow:
+            0 1px 0 rgba(255,255,255,0.95) inset,
+            0 8px 32px rgba(0, 0, 0, 0.12),
+            0 2px 8px rgba(26, 122, 94, 0.08);
+
+    padding: 8px;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    transform-origin: top right;
+}
+
+.header-user__dropdown.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+/* Bloque de información del usuario */
+.header-user__info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 10px 12px;
+}
+
+.header-user__avatar-icon {
+    font-size: 32px;
+    color: #1a7a5e;
+    font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 40;
+    flex-shrink: 0;
+    opacity: 0.85;
+}
+
+.header-user__details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.header-user__name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1e2b27;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.header-user__role {
+    font-size: 0.75rem;
+    color: #6b7c78;
+    margin-top: 1px;
+}
+
+/* Línea divisora */
+.header-user__divider {
+    height: 1px;
+    background: rgba(26, 122, 94, 0.12);
+    margin: 4px 2px;
+}
+
+/* Ítems del menú */
+.header-user__item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #1e2b27;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+    cursor: pointer;
+}
+
+.header-user__item .material-symbols-rounded {
+    font-size: 20px;
+    color: #6b7c78;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    transition: color 0.15s;
+}
+
+.header-user__item:hover {
+    background: rgba(26, 122, 94, 0.08);
+    color: #1a7a5e;
+}
+
+.header-user__item:hover .material-symbols-rounded {
+    color: #1a7a5e;
+}
+
+/* Ítem de cerrar sesión — rojo */
+.header-user__item--danger {
+    color: #b03030;
+}
+
+.header-user__item--danger .material-symbols-rounded {
+    color: #c44040;
+}
+
+.header-user__item--danger:hover {
+    background: rgba(176, 48, 48, 0.08);
+    color: #8f1f1f;
+}
+
+.header-user__item--danger:hover .material-symbols-rounded {
+    color: #8f1f1f;
+}
+/* ============================================================
+   sidebar.css  —  Menú lateral colapsable
+   Réplica del diseño de referencia con paleta verde CFE
+   ============================================================ */
+
+/* -------------------------------------------------------
+   SIDEBAR — contenedor principal
+------------------------------------------------------- */
+.sidebar {
+    /* Overlay fijo: nunca desplaza el <main> */
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    bottom: 16px;
+    z-index: 900;
+
+    /* Dimensiones — estado COLAPSADO */
+    width: 72px;
+    border-radius: 20px;
+    overflow: hidden;
+
+    /* Verde oscuro sólido (sustituye el negro de la referencia) */
+    background: #0f4a38;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+
+    display: flex;
+    flex-direction: column;
+
+    /* Transición suave al expandir */
+    transition: width 0.30s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Estado EXPANDIDO */
+.sidebar.sidebar--open {
+    width: 220px;
+}
+
+/* -------------------------------------------------------
+   CABECERA: logo + botón toggle
+------------------------------------------------------- */
+.sidebar__head {
+    display: flex;
+    align-items: center;
+    justify-content: center;     /* centrado cuando colapsado */
+    gap: 0;
+    padding: 20px 12px 16px;
+    flex-shrink: 0;
+    min-height: 72px;
+    position: relative;
+    overflow: hidden;
+    transition: justify-content 0.30s, padding 0.30s;
+}
+
+/* Abierto: logo a la izq, toggle a la der */
+.sidebar.sidebar--open .sidebar__head {
+    justify-content: space-between;
+    padding: 20px 16px 16px;
+}
+
+/* Logo CFE */
+.sidebar__logo {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    width: 0;
+    opacity: 0;
+    transition: width 0.25s 0.05s, opacity 0.20s;
+}
+
+.sidebar.sidebar--open .sidebar__logo {
+    width: 64px;
+    opacity: 1;
+}
+
+.sidebar__logo-img {
+    height: 28px;
+    width: auto;
+    /* El logo SVG de CFE es verde sobre fondo claro;
+       invertimos para que sea visible sobre el fondo oscuro */
+    filter: brightness(0) invert(1);
+    display: block;
+}
+
+/* Botón toggle (el "<" / ">" de la imagen) */
+.sidebar__toggle {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: none;
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.18s;
+}
+
+.sidebar__toggle:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.sidebar__toggle .material-symbols-rounded {
+    font-size: 20px;
+    font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+    /* Cuando está colapsado el icono apunta a la derecha (>) */
+    transform: rotate(180deg);
+    transition: transform 0.30s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Abierto: apunta a la izquierda (<) */
+.sidebar.sidebar--open .sidebar__toggle .material-symbols-rounded {
+    transform: rotate(0deg);
+}
+
+/* -------------------------------------------------------
+   NAVEGACIÓN
+------------------------------------------------------- */
+.sidebar__nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 8px;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* -------------------------------------------------------
+   ÍTEMS
+------------------------------------------------------- */
+.sidebar__item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 12px;
+    border-radius: 12px;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.65);
+    white-space: nowrap;
+    overflow: hidden;
+    transition: background 0.18s, color 0.18s;
+}
+
+.sidebar__item:hover {
+    background: rgba(255, 255, 255, 0.10);
+    color: #ffffff;
+}
+
+/* Ítem activo — fondo blanco, texto verde oscuro (igual a la referencia) */
+.sidebar__item--active {
+    background: #ffffff;
+    color: #0f4a38 !important;
+}
+
+.sidebar__item--active .sidebar__icon {
+    color: #0f4a38 !important;
+    font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24 !important;
+}
+
+/* Icono */
+.sidebar__icon {
+    font-size: 22px;
+    flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.65);
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+    transition: color 0.15s, font-variation-settings 0.15s;
+}
+
+.sidebar__item:hover .sidebar__icon {
+    color: #ffffff;
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Label de texto */
+.sidebar__label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: opacity 0.20s, transform 0.20s;
+    pointer-events: none;
+}
+
+.sidebar.sidebar--open .sidebar__label {
+    opacity: 1;
+    transform: translateX(0);
+    transition: opacity 0.22s 0.08s, transform 0.22s 0.08s;
+}
+
+/* -------------------------------------------------------
+   TOOLTIP  (colapsado: aparece al hover, tipo pill)
+------------------------------------------------------- */
+.sidebar:not(.sidebar--open) .sidebar__item::after {
+    content: attr(data-label);
+    position: absolute;
+    left: calc(100% + 14px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-4px);
+    background: #0f4a38;
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 8px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    transition: opacity 0.16s, transform 0.16s;
+    z-index: 999;
+}
+
+.sidebar:not(.sidebar--open) .sidebar__item:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+
+/* -------------------------------------------------------
+   RESPONSIVE
+------------------------------------------------------- */
+@media (max-width: 640px) {
+    .sidebar {
+        top: 8px;
+        left: 8px;
+        bottom: 8px;
+    }
+}
+
+
+/* ============================================================
+   sidebar_footer.css  —  Footer del sidebar (complementa sidebar.css)
+   ============================================================ */
+
+/* -------------------------------------------------------
+   FOOTER — contenedor inferior
+------------------------------------------------------- */
+.sidebar__footer {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 8px 12px;
+    flex-shrink: 0;
+}
+
+/* -------------------------------------------------------
+   DIVISOR
+------------------------------------------------------- */
+.sidebar__divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.10);
+    margin: 6px 4px;
+    flex-shrink: 0;
+}
+
+/* -------------------------------------------------------
+   BLOQUE DE USUARIO — ahora es <a>, clickeable → perfil.php
+------------------------------------------------------- */
+.sidebar__user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    overflow: hidden;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.18s;
+    position: relative;
+}
+
+.sidebar__user:hover {
+    background: rgba(255, 255, 255, 0.10);
+}
+
+/* Estado activo (página perfil.php activa) */
+.sidebar__user--active {
+    background: rgba(255, 255, 255, 0.20);
+}
+
+/* Avatar circular */
+.sidebar__user-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.18s;
+}
+
+.sidebar__user:hover .sidebar__user-avatar {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.sidebar__user-avatar .material-symbols-rounded {
+    font-size: 20px;
+    color: rgba(255, 255, 255, 0.85);
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+}
+
+/* Bloque de texto */
+.sidebar__user-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: opacity 0.20s, transform 0.20s;
+    pointer-events: none;
+}
+
+.sidebar.sidebar--open .sidebar__user-info {
+    opacity: 1;
+    transform: translateX(0);
+    transition: opacity 0.22s 0.08s, transform 0.22s 0.08s;
+}
+
+.sidebar__user-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar__user-role {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+}
+
+/* Tooltip cuando está colapsado */
+.sidebar:not(.sidebar--open) .sidebar__user::after {
+    content: attr(data-label);
+    position: absolute;
+    left: calc(100% + 14px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-4px);
+    background: #0f4a38;
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 8px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    transition: opacity 0.16s, transform 0.16s;
+    z-index: 999;
+}
+
+.sidebar:not(.sidebar--open) .sidebar__user:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+
+/* -------------------------------------------------------
+   ÍTEM DANGER — cerrar sesión (rojo)
+------------------------------------------------------- */
+.sidebar__item--danger {
+    color: #ff8a80 !important;
+}
+
+.sidebar__item--danger .sidebar__icon {
+    color: #ff8a80 !important;
+}
+
+.sidebar__item--danger:hover {
+    background: rgba(255, 80, 80, 0.12) !important;
+    color: #ff6b6b !important;
+}
+
+.sidebar__item--danger:hover .sidebar__icon {
+    color: #ff6b6b !important;
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+}
+
+
+

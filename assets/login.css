@@ -1,0 +1,223 @@
+/*ESTILOS PARA EL LOGIN*/
+* {
+    margin: 0px;
+    padding: 0px;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Helvetica;
+    font-size: 16px;
+    line-height: 24px;
+    color: #000000;
+    background-color: #ECECEC;
+}
+
+.margen {
+    padding: 10px;
+}
+
+.ancho {
+    max-width: 1200px;
+    margin: auto;
+}
+
+.centrar {
+    text-align: center;
+}
+
+.login-page-wrapper {
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Sans', sans-serif;
+
+    /* IMAGEN DE FONDO */
+    background-image: url("multimedia/fondo_login.jpg");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    position: relative;
+}
+
+/* Oscurecimiento para que el cristal resalte mejor */
+.login-page-wrapper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 0;
+}
+
+.contenedor_login-fondo {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 2rem;
+}
+
+/* EFECTO LIQUID CRYSTAL / GLASSMORPHISM */
+.contenedor_login {
+    background: rgba(255, 255, 255, 0.1); /* Blanco muy translúcido */
+    backdrop-filter: blur(20px) saturate(160%); /* El desenfoque crea el efecto cristal */
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+
+    /* Borde que simula el filo del vidrio */
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 24px;
+
+    padding: 3rem 2.5rem;
+    width: 100%;
+    max-width: 420px;
+
+    /* Sombra suave para despegarlo del fondo */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: white;
+}
+
+.login-titulo {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.5px;
+}
+
+.login-imagen {
+    margin-bottom: 1.5rem;
+}
+
+.imagen_log {
+    width: 150px;
+    height: 75px;
+}
+
+.login-credenciales {
+    width: 100%;
+}
+
+.titulo-credenciales {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 0.5rem;
+    margin-top: 1rem;
+    font-weight: 500;
+}
+
+.input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.elementologin {
+    width: 100%;
+    padding: 14px 14px 14px 45px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: white;
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.input-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.elementologin:focus {
+    background: rgba(0, 193, 90, 0.18);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.row-extras {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin: 1.5rem 0;
+    font-size: 0.85rem;
+}
+
+.remember-label {
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.link-forgot {
+    background: none;
+    border: none;
+    color: white;
+    text-decoration: underline;
+    cursor: pointer;
+    font-family: inherit;
+    opacity: 0.8;
+}
+
+/* Botón sólido para contraste */
+.btn_login {
+    width: 100%;
+    padding: 16px;
+    background: white;
+    border: none;
+    border-radius: 12px;
+    color: #111;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn_login:hover {
+    background: rgba(255, 255, 255, 0.9);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.register-link {
+    margin-top: 2rem;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.register-link a {
+    color: white;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* =========================================
+   ESTILOS NUEVOS PARA EL MENSAJE DE ERROR
+   ========================================= */
+.mensaje-error-login {
+    background: rgba(255, 69, 58, 0.15); /* Fondo rojo translúcido */
+    border: 1px solid rgba(255, 69, 58, 0.4);
+    color: #ffb3b3;
+    padding: 12px 15px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    backdrop-filter: blur(5px);
+    animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}

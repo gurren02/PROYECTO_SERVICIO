@@ -1,0 +1,154 @@
+/* ---------- Bienvenida ---------- */
+.idx-welcome {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 36px;
+}
+
+.idx-welcome__title {
+    margin: 0 0 4px 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #1e2b27;
+    letter-spacing: -0.02em;
+}
+
+.idx-welcome__sub {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #6b7c78;
+}
+
+.idx-welcome__date {
+    font-size: 0.85rem;
+    color: #6b7c78;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* ---------- Grid de tarjetas ---------- */
+.idx-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 20px;
+}
+
+/* ---------- Tarjeta base ---------- */
+.idx-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 26px 24px 22px;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    text-decoration: none;
+    color: #1e2b27;
+    overflow: hidden;
+    border: 1px solid #e4ede9;
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.22s ease,
+    border-color 0.22s;
+}
+
+.idx-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(26,122,94,0.15);
+    border-color: rgba(26,122,94,0.28);
+}
+
+/* Glow decorativo */
+.idx-card__glow {
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s;
+}
+
+.idx-card:hover .idx-card__glow { opacity: 1; }
+
+/* Icono */
+.idx-card__icon-wrap {
+    width: 52px;
+    height: 52px;
+    border-radius: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.idx-card:hover .idx-card__icon-wrap { transform: scale(1.10); }
+
+.idx-card__icon {
+    font-size: 26px;
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 28;
+}
+
+/* Textos */
+.idx-card__title {
+    margin: 0 0 6px 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1e2b27;
+}
+
+.idx-card__desc {
+    margin: 0;
+    font-size: 0.84rem;
+    color: #6b7c78;
+    line-height: 1.55;
+}
+
+/* Flecha */
+.idx-card__arrow {
+    align-self: flex-end;
+    font-size: 18px;
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity 0.2s, transform 0.2s;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+}
+
+.idx-card:hover .idx-card__arrow {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Variantes de color */
+.idx-card--upload .idx-card__icon-wrap { background: #e8f5f1; }
+.idx-card--upload .idx-card__icon      { color: #1a7a5e; }
+.idx-card--upload .idx-card__arrow     { color: #1a7a5e; }
+.idx-card--upload .idx-card__glow      { background: radial-gradient(circle, rgba(26,122,94,0.18), transparent 70%); }
+
+.idx-card--tables .idx-card__icon-wrap { background: #e2f0ea; }
+.idx-card--tables .idx-card__icon      { color: #1e8a68; }
+.idx-card--tables .idx-card__arrow     { color: #1e8a68; }
+.idx-card--tables .idx-card__glow      { background: radial-gradient(circle, rgba(30,138,104,0.16), transparent 70%); }
+
+.idx-card--calc .idx-card__icon-wrap   { background: #daf0e6; }
+.idx-card--calc .idx-card__icon        { color: #14755a; }
+.idx-card--calc .idx-card__arrow       { color: #14755a; }
+.idx-card--calc .idx-card__glow        { background: radial-gradient(circle, rgba(20,117,90,0.15), transparent 70%); }
+
+.idx-card--users .idx-card__icon-wrap  { background: #d3ebe0; }
+.idx-card--users .idx-card__icon       { color: #0f6248; }
+.idx-card--users .idx-card__arrow      { color: #0f6248; }
+.idx-card--users .idx-card__glow       { background: radial-gradient(circle, rgba(15,98,72,0.14), transparent 70%); }
+
+/* Responsive */
+@media (max-width: 640px) {
+    .idx-main  { padding: 24px 16px; }
+    .idx-grid  { grid-template-columns: 1fr; }
+    .sidebar   { top: 76px; }
+}

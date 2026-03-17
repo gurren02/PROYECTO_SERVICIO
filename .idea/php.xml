@@ -15,6 +15,9 @@
       <phpcs_by_interpreter asDefaultInterpreter="true" interpreter_id="f0804edb-ea9b-47fa-a967-7d6b3d92d170" timeout="30000" />
     </phpcs_settings>
   </component>
+  <component name="PhpProjectSharedConfiguration" php_language_level="5.5.0">
+    <option name="suggestChangeDefaultLanguageLevel" value="false" />
+  </component>
   <component name="PhpStan">
     <PhpStan_settings>
       <phpstan_by_interpreter asDefaultInterpreter="true" interpreter_id="f0804edb-ea9b-47fa-a967-7d6b3d92d170" timeout="60000" />

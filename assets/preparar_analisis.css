@@ -1,0 +1,439 @@
+/* ============================================================
+   calcular.css — Estilos para la vista de análisis comparativo
+   Sistema CFE — Gestión de Anomalías
+   ============================================================ */
+
+:root {
+    --cl-primary:    #1a7a5e;
+    --cl-primary-dk: #145e49;
+    --cl-primary-lt: #e8f5f1;
+    --cl-text:       #1e2b27;
+    --cl-muted:      #6b7c78;
+    --cl-border:     #d6e0dd;
+    --cl-card:       #ffffff;
+    --cl-bg:         #f0f2f0;
+    --cl-ok-fg:      #176649;
+    --cl-ok-bg:      #eaf6f1;
+    --cl-ok-br:      #a8d9c5;
+    --cl-add-fg:     #b05a10;
+    --cl-add-bg:     #fff4e8;
+    --cl-add-br:     #f0c898;
+    --cl-radius:     10px;
+    --cl-radius-sm:  6px;
+    --cl-shadow:     0 2px 16px rgba(0,0,0,0.07);
+    --cl-font:       'Segoe UI', system-ui, sans-serif;
+    /* colores de los 3 periodos */
+    --cl-p1:         #1a7a5e;
+    --cl-p2:         #2e86ab;
+    --cl-p3:         #8b5cf6;
+}
+
+/* ---------- Layout ---------- */
+.calc-main {
+    padding: 36px 32px;
+    font-family: var(--cl-font);
+    color: var(--cl-text);
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+/* ---------- Encabezado de página ---------- */
+.calc-page-header { margin-bottom: 4px; }
+
+.calc-page-title {
+    margin: 0 0 6px 0;
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--cl-text);
+    letter-spacing: -0.01em;
+}
+
+.calc-page-subtitle {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--cl-muted);
+    max-width: 680px;
+    line-height: 1.55;
+}
+
+/* ---------- Tarjeta base ---------- */
+.calc-card {
+    background: var(--cl-card);
+    border-radius: var(--cl-radius);
+    box-shadow: var(--cl-shadow);
+    overflow: hidden;
+    border: 1px solid #eaf0ed;
+}
+
+.calc-card__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 22px;
+    background: var(--cl-primary);
+    color: #fff;
+    font-size: 0.92rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.calc-card__header .material-symbols-rounded {
+    font-size: 20px;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+}
+
+.calc-card__body {
+    padding: 22px;
+}
+
+/* ---------- Formulario ---------- */
+.calc-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.calc-form__group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 160px;
+}
+
+.calc-form__label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--cl-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.calc-form__label .material-symbols-rounded {
+    font-size: 15px;
+    font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 16;
+}
+
+.calc-form__control {
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid var(--cl-border);
+    border-radius: var(--cl-radius-sm);
+    font-family: var(--cl-font);
+    font-size: 0.92rem;
+    color: var(--cl-text);
+    background: #fff;
+    outline: none;
+    transition: border-color 0.18s, box-shadow 0.18s;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+select.calc-form__control {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7c78' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+    cursor: pointer;
+}
+
+.calc-form__control:focus {
+    border-color: var(--cl-primary);
+    box-shadow: 0 0 0 3px rgba(26,122,94,0.12);
+}
+
+/* ---------- Botones ---------- */
+.calc-btn--primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 42px;
+    padding: 0 22px;
+    background: var(--cl-primary);
+    color: #fff;
+    border: none;
+    border-radius: var(--cl-radius-sm);
+    font-family: var(--cl-font);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.18s, box-shadow 0.18s, transform 0.1s;
+    letter-spacing: 0.01em;
+}
+
+.calc-btn--primary .material-symbols-rounded {
+    font-size: 18px;
+    font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20;
+}
+
+.calc-btn--primary:hover {
+    background: var(--cl-primary-dk);
+    box-shadow: 0 3px 10px rgba(26,122,94,0.22);
+}
+
+.calc-btn--primary:active { transform: scale(0.97); }
+
+/* ---------- Chips de periodos ---------- */
+.calc-periods {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.calc-period-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--cl-card);
+    border: 1px solid var(--cl-border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+    flex: 1;
+    min-width: 160px;
+}
+
+.calc-period-chip__dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.calc-period-chip__dot--p1 { background: var(--cl-p1); }
+.calc-period-chip__dot--p2 { background: var(--cl-p2); }
+.calc-period-chip__dot--p3 { background: var(--cl-p3); }
+
+.calc-period-chip > div {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.calc-period-chip__label {
+    font-size: 0.73rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--cl-muted);
+}
+
+.calc-period-chip__value {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--cl-text);
+}
+
+/* ---------- Tabla ---------- */
+.calc-table-wrapper {
+    overflow-x: auto;
+}
+
+.calc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.calc-table thead tr {
+    border-bottom: 2px solid var(--cl-border);
+    background: #f5f8f6;
+}
+
+.calc-table thead th {
+    padding: 13px 18px;
+    text-align: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--cl-muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.calc-table__th-name {
+    text-align: left !important;
+}
+
+/* Header con punto de color de periodo */
+.calc-th-period {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.calc-th-period__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.calc-th-period__dot--p1 { background: var(--cl-p1); }
+.calc-th-period__dot--p2 { background: var(--cl-p2); }
+.calc-th-period__dot--p3 { background: var(--cl-p3); }
+
+/* Filas */
+.calc-table tbody tr {
+    border-bottom: 1px solid #eef2f0;
+    transition: background 0.14s;
+}
+
+.calc-table tbody tr:last-child { border-bottom: none; }
+
+.calc-table tbody tr:hover { background: var(--cl-primary-lt); }
+
+/* Fila completamente lista */
+.calc-table__row--complete {
+    background: rgba(26,122,94,0.03);
+}
+
+.calc-table tbody td {
+    padding: 13px 18px;
+    vertical-align: middle;
+}
+
+/* Celda nombre */
+.calc-table__name {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 600;
+    color: var(--cl-text);
+    text-align: left;
+}
+
+.calc-table__name-icon {
+    font-size: 18px;
+    color: var(--cl-muted);
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    flex-shrink: 0;
+}
+
+.calc-table__row--complete .calc-table__name-icon {
+    color: var(--cl-primary);
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+}
+
+/* Celda de estado */
+.calc-table__cell {
+    text-align: center;
+}
+
+.calc-status-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.calc-update-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f0f2f0;
+    color: #5f6b67;
+    border: 1px solid #dce2e0;
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.calc-update-date .material-symbols-rounded {
+    font-size: 14px;
+    font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20;
+}
+
+/* Estado OK */
+.calc-status--ok {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--cl-ok-bg);
+    color: var(--cl-ok-fg);
+    border: 1px solid var(--cl-ok-br);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.calc-status--ok .material-symbols-rounded {
+    font-size: 16px;
+    font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 20;
+}
+
+/* Botón agregar (faltante) */
+.calc-btn-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--cl-add-bg);
+    color: var(--cl-add-fg);
+    border: 1px solid var(--cl-add-br);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.18s, border-color 0.18s, transform 0.1s;
+}
+
+.calc-btn-add .material-symbols-rounded {
+    font-size: 15px;
+    font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20;
+}
+
+.calc-btn-add:hover {
+    background: #ffe8cc;
+    border-color: #e0a060;
+}
+
+.calc-btn-add:active { transform: scale(0.97); }
+
+/* ---------- Botón generar reporte ---------- */
+.calc-btn-generate {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: var(--cl-primary);
+    color: #fff;
+    text-decoration: none;
+    padding: 16px 28px;
+    border-radius: var(--cl-radius);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    box-shadow: 0 4px 16px rgba(26,122,94,0.25);
+    transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+}
+
+.calc-btn-generate .material-symbols-rounded {
+    font-size: 22px;
+    font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+}
+
+.calc-btn-generate:hover {
+    background: var(--cl-primary-dk);
+    box-shadow: 0 6px 24px rgba(26,122,94,0.30);
+}
+
+.calc-btn-generate:active { transform: scale(0.98); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 640px) {
+    .calc-main    { padding: 20px 14px; }
+    .calc-form    { flex-direction: column; }
+    .calc-periods { flex-direction: column; }
+}
