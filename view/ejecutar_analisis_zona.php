@@ -7,6 +7,10 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 include "../src/seguridad.php";
 
+// Aumentar límites para XAMPP (evitar timeouts con tablas grandes)
+set_time_limit(120);
+ini_set('memory_limit', '256M');
+
 // 2. CONEXIÓN A LA BASE DE DATOS
 require "../config/conexion.php";
 
@@ -20,7 +24,7 @@ $filtro_zona    = isset($_GET['zona'])  ? trim($_GET['zona'])  : '';
 $ciclo_inicio   = isset($_GET['ciclo_inicio']) ? trim($_GET['ciclo_inicio']) : '';
 $ciclo_fin      = isset($_GET['ciclo_fin']) ? trim($_GET['ciclo_fin']) : '';
 
-// NUEVOS FILTROS PARA EL SEGUNDO RANGO
+// FILTROS PARA EL SEGUNDO RANGO
 $ciclo_inicio_2 = isset($_GET['ciclo_inicio_2']) ? trim($_GET['ciclo_inicio_2']) : '';
 $ciclo_fin_2    = isset($_GET['ciclo_fin_2']) ? trim($_GET['ciclo_fin_2']) : '';
 
@@ -32,17 +36,17 @@ if ($p3_mes <= 0) { $p3_mes += 12; $p3_anio -= 1; }
 $tipo_comp = isset($_GET['comp']) && $_GET['comp'] === 'anual' ? 'anual' : 'bimestre';
 
 $sufijos = [
-        'actual'   => $p1_anio . str_pad($p1_mes, 2, '0', STR_PAD_LEFT)
+    'actual' => $p1_anio . str_pad($p1_mes, 2, '0', STR_PAD_LEFT)
 ];
 
 function obtenerNombreMes($num) {
     $meses = [1=>'ENERO',2=>'FEBRERO',3=>'MARZO',4=>'ABRIL',5=>'MAYO',6=>'JUNIO',
-            7=>'JULIO',8=>'AGOSTO',9=>'SEPTIEMBRE',10=>'OCTUBRE',11=>'NOVIEMBRE',12=>'DICIEMBRE'];
+              7=>'JULIO',8=>'AGOSTO',9=>'SEPTIEMBRE',10=>'OCTUBRE',11=>'NOVIEMBRE',12=>'DICIEMBRE'];
     return $meses[$num] ?? '';
 }
 
 $meses_abrev = [1=>'ENE',2=>'FEB',3=>'MAR',4=>'ABR',5=>'MAY',6=>'JUN',
-        7=>'JUL',8=>'AGO',9=>'SEP',10=>'OCT',11=>'NOV',12=>'DIC'];
+                7=>'JUL',8=>'AGO',9=>'SEP',10=>'OCT',11=>'NOV',12=>'DIC'];
 
 if ($tipo_comp === 'anual') {
     $p2_mes = $p1_mes;
@@ -58,7 +62,7 @@ if ($tipo_comp === 'anual') {
     $lbl_comp = obtenerNombreMes($p3_mes).' '.$p3_anio;
 }
 
-// --- GENERACIÓN DE TÍTULO DINÁMICO MEJORADA PARA 2 RANGOS ---
+// Título dinámico
 $rango1 = "";
 if ($ciclo_inicio !== '' && $ciclo_fin !== '') { $rango1 = "$ciclo_inicio AL $ciclo_fin"; }
 elseif ($ciclo_inicio !== '') { $rango1 = "$ciclo_inicio"; }
@@ -85,29 +89,35 @@ if ($filtro_zona !== '') {
 $titulo_reporte = $prefijo_titulo . " RESULTADO NIVEL ZONA " . obtenerNombreMes($p1_mes) . " $p1_anio";
 
 $mapa_agencias = [
-        'A'=>'CENTRO','B'=>'NORTE','C'=>'SUR','D'=>'ORIENTE','E'=>'PONIENTE',
-        'G'=>'PROGRESO','H'=>'HUNUCMA','J'=>'UMAN','K'=>'ACANCEH','M'=>'CONKAL'
+    'A'=>'CENTRO','B'=>'NORTE','C'=>'SUR','D'=>'ORIENTE','E'=>'PONIENTE',
+    'G'=>'PROGRESO','H'=>'HUNUCMA','J'=>'UMAN','K'=>'ACANCEH','M'=>'CONKAL'
 ];
 
 $anomalias = ['cancelaciones','estimaciones','consumos_cero','servicios_sin_medicion',
-        'correcciones_de_lecturas','anomalias_pendientes','sin_facturar','cargas_directas'];
+              'correcciones_de_lecturas','anomalias_pendientes','sin_facturar','cargas_directas'];
 
 $resultados = [];
 $combinaciones_existentes = [];
 $total_registros_analisis = 0;
 $ultima_actualizacion_analisis = 'No disponible';
 
-// 4. MOTOR DE CONSULTAS (Soporte para múltiples rangos de ciclos)
+// ==============================================================================
+// 4. MOTOR DE CONSULTAS OPTIMIZADO
+// ==============================================================================
+
+// OPTIMIZACIÓN #1: Una sola query para conocer qué tablas existen en la BD,
+// en lugar de SHOW TABLES LIKE por cada anomalía dentro de un loop.
+$stmt_all_tables = $pdo->query("SHOW TABLES");
+$todas_las_tablas = array_flip($stmt_all_tables->fetchAll(PDO::FETCH_COLUMN));
+
 $zonas_disponibles  = [];
 $ciclos_disponibles = [];
 $tablas_involucradas = [];
 
-// Obtener filtros disponibles desde las tablas actuales
+// Filtros disponibles (solo desde tablas del período actual)
 foreach ($anomalias as $anomalia) {
     $nombre_tabla = $anomalia . $sufijos['actual'];
-    $stmt_check = $pdo->prepare("SHOW TABLES LIKE ?");
-    $stmt_check->execute([$nombre_tabla]);
-    if ($stmt_check->rowCount() > 0) {
+    if (isset($todas_las_tablas[$nombre_tabla])) {
         $tablas_involucradas[] = $nombre_tabla;
         try {
             $stmt_z = $pdo->query("SELECT DISTINCT CAST(TRIM(`Zona`) AS UNSIGNED) as z FROM `$nombre_tabla` WHERE `Zona` IS NOT NULL AND `Zona` != ''");
@@ -120,7 +130,7 @@ foreach ($anomalias as $anomalia) {
 $zonas_disponibles  = array_unique($zonas_disponibles);  sort($zonas_disponibles);
 $ciclos_disponibles = array_unique($ciclos_disponibles); sort($ciclos_disponibles);
 
-// Obtener última actualización de las tablas involucradas
+// Última actualización
 if (!empty($tablas_involucradas)) {
     $placeholders = implode(',', array_fill(0, count($tablas_involucradas), '?'));
     $stmt_u = $pdo->prepare("SELECT MAX(fecha_subida) FROM registro_archivos WHERE nombre_tabla IN ($placeholders)");
@@ -129,160 +139,84 @@ if (!empty($tablas_involucradas)) {
     if ($res_u) $ultima_actualizacion_analisis = date('d/m/Y H:i', strtotime($res_u));
 }
 
+// OPTIMIZACIÓN #2: Función helper para construir la cláusula WHERE de ciclos.
+// Evita duplicar la misma lógica varias veces.
+function buildCicloWhere($ciclo_inicio, $ciclo_fin, $ciclo_inicio_2, $ciclo_fin_2, &$params, $alias = '') {
+    $col = $alias ? "`$alias`.`Ciclo`" : '`Ciclo`';
+    $condiciones = [];
+    if ($ciclo_inicio !== '' && $ciclo_fin !== '') {
+        $condiciones[] = "CAST(TRIM($col) AS UNSIGNED) BETWEEN ? AND ?";
+        $params[] = (int)$ciclo_inicio; $params[] = (int)$ciclo_fin;
+    } elseif ($ciclo_inicio !== '') {
+        $condiciones[] = "CAST(TRIM($col) AS UNSIGNED) = ?";
+        $params[] = (int)$ciclo_inicio;
+    }
+    if ($ciclo_inicio_2 !== '' && $ciclo_fin_2 !== '') {
+        $condiciones[] = "CAST(TRIM($col) AS UNSIGNED) BETWEEN ? AND ?";
+        $params[] = (int)$ciclo_inicio_2; $params[] = (int)$ciclo_fin_2;
+    } elseif ($ciclo_inicio_2 !== '') {
+        $condiciones[] = "CAST(TRIM($col) AS UNSIGNED) = ?";
+        $params[] = (int)$ciclo_inicio_2;
+    }
+    if (!empty($condiciones)) {
+        return " AND (" . implode(" OR ", $condiciones) . ")";
+    }
+    return "";
+}
+
+// Consultas principales (actual + bimestre)
 foreach ($sufijos as $periodo_key => $sufijo) {
     foreach ($anomalias as $anomalia) {
         $nombre_tabla = $anomalia . $sufijo;
-        $stmt_check = $pdo->prepare("SHOW TABLES LIKE ?");
-        $stmt_check->execute([$nombre_tabla]);
-
-        if ($stmt_check->rowCount() > 0) {
-            try {
-                $where_sql = "WHERE 1=1";
-                $parametros_sql = [];
-
-                // === SOLUCIÓN: Conversión matemática de ZONA ===
-                if ($filtro_zona !== '')  {
-                    $where_sql .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
-                    $parametros_sql[] = (int)$filtro_zona;
-                }
-
-                // LÓGICA DE MULTI-RANGO DE CICLOS CON CONVERSIÓN MATEMÁTICA
-                $condiciones_ciclo = [];
-
-                // Evaluar Rango 1
-                if ($ciclo_inicio !== '' && $ciclo_fin !== '') {
-                    $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) BETWEEN ? AND ?";
-                    $parametros_sql[] = (int)$ciclo_inicio;
-                    $parametros_sql[] = (int)$ciclo_fin;
-                } elseif ($ciclo_inicio !== '') {
-                    $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) = ?";
-                    $parametros_sql[] = (int)$ciclo_inicio;
-                }
-
-                // Evaluar Rango 2
-                if ($ciclo_inicio_2 !== '' && $ciclo_fin_2 !== '') {
-                    $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) BETWEEN ? AND ?";
-                    $parametros_sql[] = (int)$ciclo_inicio_2;
-                    $parametros_sql[] = (int)$ciclo_fin_2;
-                } elseif ($ciclo_inicio_2 !== '') {
-                    $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) = ?";
-                    $parametros_sql[] = (int)$ciclo_inicio_2;
-                }
-
-                // Unir las condiciones de ciclos con un OR
-                if (count($condiciones_ciclo) > 0) {
-                    $where_sql .= " AND (" . implode(" OR ", $condiciones_ciclo) . ")";
-                }
-
-                $query = "SELECT TRIM(`Zona`) as zona_bd, UPPER(TRIM(`$columna_agencia`)) as letra_bd, COUNT(*) as total 
-                          FROM `$nombre_tabla` $where_sql
-                          GROUP BY TRIM(`Zona`), UPPER(TRIM(`$columna_agencia`))";
-
-                $stmt_data = $pdo->prepare($query);
-                $stmt_data->execute($parametros_sql);
-
-                while ($fila = $stmt_data->fetch(PDO::FETCH_ASSOC)) {
-                    $zona_bd = $fila['zona_bd'];
-                    $letra_bd = $fila['letra_bd'];
-
-                    if($zona_bd !== '' && $zona_bd !== null) {
-                        if (array_key_exists($letra_bd, $mapa_agencias)) {
-                            $nombre_real = $mapa_agencias[$letra_bd];
-                        } elseif (in_array($letra_bd, $mapa_agencias)) {
-                            $nombre_real = $letra_bd;
-                        } else {
-                            $nombre_real = 'OTRA';
-                        }
-
-                        $combinaciones_existentes[$zona_bd][$nombre_real] = true;
-
-                        if(!isset($resultados[$periodo_key][$zona_bd][$nombre_real][$anomalia])) {
-                            $resultados[$periodo_key][$zona_bd][$nombre_real][$anomalia] = 0;
-                        }
-                        $resultados[$periodo_key][$zona_bd][$nombre_real][$anomalia] += (int)$fila['total'];
-                    }
-                }
-            } catch (PDOException $e) {}
-        }
-    }
-}
-
-// ==========================================
-// CÁLCULO DE REINCIDENTES
-// ==========================================
-foreach ($anomalias as $anomalia) {
-    if (!isset($sufijos['actual']) || !isset($sufijos['bimestre'])) continue;
-    $tabla_actual = $anomalia . $sufijos['actual'];
-    $tabla_comp   = $anomalia . $sufijos['bimestre'];
-    
-    $stmt_c1 = $pdo->prepare("SHOW TABLES LIKE ?"); $stmt_c1->execute([$tabla_actual]);
-    $stmt_c2 = $pdo->prepare("SHOW TABLES LIKE ?"); $stmt_c2->execute([$tabla_comp]);
-
-    if ($stmt_c1->rowCount() > 0 && $stmt_c2->rowCount() > 0) {
+        // Verificación en memoria O(1) — sin llamada a BD
+        if (!isset($todas_las_tablas[$nombre_tabla])) continue;
         try {
             $where_sql = "WHERE 1=1";
             $parametros_sql = [];
-
             if ($filtro_zona !== '')  {
                 $where_sql .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
                 $parametros_sql[] = (int)$filtro_zona;
             }
+            $where_sql .= buildCicloWhere($ciclo_inicio, $ciclo_fin, $ciclo_inicio_2, $ciclo_fin_2, $parametros_sql);
 
-            $condiciones_ciclo = [];
-            if ($ciclo_inicio !== '' && $ciclo_fin !== '') {
-                $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) BETWEEN ? AND ?";
-                $parametros_sql[] = (int)$ciclo_inicio; $parametros_sql[] = (int)$ciclo_fin;
-            } elseif ($ciclo_inicio !== '') {
-                $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) = ?";
-                $parametros_sql[] = (int)$ciclo_inicio;
-            }
-
-            if ($ciclo_inicio_2 !== '' && $ciclo_fin_2 !== '') {
-                $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) BETWEEN ? AND ?";
-                $parametros_sql[] = (int)$ciclo_inicio_2; $parametros_sql[] = (int)$ciclo_fin_2;
-            } elseif ($ciclo_inicio_2 !== '') {
-                $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) = ?";
-                $parametros_sql[] = (int)$ciclo_inicio_2;
-            }
-
-            if (count($condiciones_ciclo) > 0) {
-                $where_sql .= " AND (" . implode(" OR ", $condiciones_ciclo) . ")";
-            }
-
-            // JOIN CON REINCIDENTES BASADO EN RPU
-            $query_reinc = "SELECT TRIM(`Zona`) as zona_bd, UPPER(TRIM(`$columna_agencia`)) as letra_bd, COUNT(DISTINCT TRIM(`Rpu`)) as total 
-                      FROM `$tabla_actual` $where_sql 
-                      AND TRIM(`Rpu`) IN (SELECT TRIM(`Rpu`) FROM `$tabla_comp` WHERE `Rpu` IS NOT NULL AND TRIM(`Rpu`) != '')
+            $query = "SELECT TRIM(`Zona`) as zona_bd, UPPER(TRIM(`$columna_agencia`)) as letra_bd, COUNT(*) as total
+                      FROM `$nombre_tabla` $where_sql
                       GROUP BY TRIM(`Zona`), UPPER(TRIM(`$columna_agencia`))";
 
-            $stmt_data = $pdo->prepare($query_reinc);
+            $stmt_data = $pdo->prepare($query);
             $stmt_data->execute($parametros_sql);
 
             while ($fila = $stmt_data->fetch(PDO::FETCH_ASSOC)) {
-                $zona_bd = $fila['zona_bd'];
+                $zona_bd  = $fila['zona_bd'];
                 $letra_bd = $fila['letra_bd'];
-
-                if($zona_bd !== '' && $zona_bd !== null) {
-                    if (array_key_exists($letra_bd, $mapa_agencias)) $nombre_real = $mapa_agencias[$letra_bd];
-                    elseif (in_array($letra_bd, $mapa_agencias)) $nombre_real = $letra_bd;
-                    else $nombre_real = 'OTRA';
-
-                    if(!isset($resultados['reincidentes'][$zona_bd][$nombre_real][$anomalia])) {
-                        $resultados['reincidentes'][$zona_bd][$nombre_real][$anomalia] = 0;
+                if ($zona_bd !== '' && $zona_bd !== null) {
+                    if (array_key_exists($letra_bd, $mapa_agencias)) {
+                        $nombre_real = $mapa_agencias[$letra_bd];
+                    } elseif (in_array($letra_bd, $mapa_agencias)) {
+                        $nombre_real = $letra_bd;
+                    } else {
+                        $nombre_real = 'OTRA';
                     }
-                    $resultados['reincidentes'][$zona_bd][$nombre_real][$anomalia] += (int)$fila['total'];
+                    $combinaciones_existentes[$zona_bd][$nombre_real] = true;
+                    if (!isset($resultados[$periodo_key][$zona_bd][$nombre_real][$anomalia])) {
+                        $resultados[$periodo_key][$zona_bd][$nombre_real][$anomalia] = 0;
+                    }
+                    $resultados[$periodo_key][$zona_bd][$nombre_real][$anomalia] += (int)$fila['total'];
                 }
             }
         } catch (PDOException $e) {}
     }
 }
 
+// ==============================================================================
+// REINCIDENTES → se calculan vía AJAX al cargar la página (no bloquea el render)
+// ==============================================================================
+
 // 5. ORDENAMIENTO
 $lista_zonas = array_keys($combinaciones_existentes);
 sort($lista_zonas, SORT_NUMERIC);
 
-$tipos_res = array_merge(array_keys($sufijos), ['reincidentes']);
-foreach ($tipos_res as $periodo_key) {
+foreach (array_keys($sufijos) as $periodo_key) {
     foreach ($lista_zonas as $z) {
         foreach (array_keys($combinaciones_existentes[$z]) as $a) {
             foreach ($anomalias as $anomalia) {
@@ -293,7 +227,7 @@ foreach ($tipos_res as $periodo_key) {
         }
     }
 }
-// Calcular total de registros para el mes actual
+// Total de registros para el período actual
 if (isset($resultados['actual'])) {
     foreach ($resultados['actual'] as $zona_data) {
         foreach ($zona_data as $agencia_data) {
@@ -568,8 +502,7 @@ if (isset($resultados['actual'])) {
                                     $clase_dif = $diferencia > 0 ? 'dif-pos' : ($diferencia < 0 ? 'dif-neg' : 'dif-zero');
                                     $signo = $diferencia > 0 ? '+' : '';
                                     
-                                    $val_reinc = isset($resultados['reincidentes'][$zona][$agencia][$anomalia]) ? $resultados['reincidentes'][$zona][$agencia][$anomalia] : 0;
-                                    $totales_columnas_reinc[$anomalia] += $val_reinc;
+                                    // Reincidentes: se actualizarán via AJAX, solo generamos la celda con datos-id
                                     ?>
 
                                     <td class="b-left ea-td-num <?php echo $val_actual > 0 ? 'ea-td-num--val' : ''; ?>">
@@ -609,24 +542,19 @@ if (isset($resultados['actual'])) {
                                     <td class="ea-td-num td-dif <?php echo $clase_dif; ?>">
                                         <?php echo $diferencia !== 0 ? $signo . number_format($diferencia) : '-'; ?>
                                     </td>
-                                    <td class="ea-td-num" style="background-color: #fdf5f6; font-weight: 600; color: #dc3545;">
-                                        <?php if ($val_reinc > 0): ?>
-                                            <a href="javascript:void(0)" class="ea-detail-trigger" 
-                                               data-modo="reincidente"
-                                               data-tabla="<?php echo $anomalia . $sufijos['actual']; ?>" 
-                                               data-tablacomp="<?php echo $anomalia . $sufijos['bimestre']; ?>" 
-                                               data-agencia="<?php echo $agencia; ?>" 
-                                               data-zona="<?php echo $zona; ?>"
-                                               data-ciclo_inicio="<?php echo htmlspecialchars($ciclo_inicio); ?>"
-                                               data-ciclo_fin="<?php echo htmlspecialchars($ciclo_fin); ?>"
-                                               data-ciclo_inicio_2="<?php echo htmlspecialchars($ciclo_inicio_2); ?>"
-                                               data-ciclo_fin_2="<?php echo htmlspecialchars($ciclo_fin_2); ?>"
-                                               data-titulo="REINCIDENTES - <?php echo strtoupper(str_replace('_', ' ', $anomalia)) . ' - ' . $agencia . ' (ZONA ' . $zona . ')'; ?>" style="color: #dc3545;">
-                                                <?php echo number_format($val_reinc); ?>
-                                            </a>
-                                        <?php else: ?>
-                                            <span style="color: #e4a1a8;">0</span>
-                                        <?php endif; ?>
+                                    <td class="ea-td-num reinc-cell" 
+                                        data-zona="<?php echo htmlspecialchars($zona); ?>"
+                                        data-agencia="<?php echo htmlspecialchars($agencia); ?>"
+                                        data-anomalia="<?php echo htmlspecialchars($anomalia); ?>"
+                                        data-tabla="<?php echo $anomalia . $sufijos['actual']; ?>"
+                                        data-tablacomp="<?php echo $anomalia . $sufijos['bimestre']; ?>"
+                                        data-ciclo_inicio="<?php echo htmlspecialchars($ciclo_inicio); ?>"
+                                        data-ciclo_fin="<?php echo htmlspecialchars($ciclo_fin); ?>"
+                                        data-ciclo_inicio_2="<?php echo htmlspecialchars($ciclo_inicio_2); ?>"
+                                        data-ciclo_fin_2="<?php echo htmlspecialchars($ciclo_fin_2); ?>"
+                                        data-titulo="REINCIDENTES - <?php echo strtoupper(str_replace('_', ' ', $anomalia)) . ' - ' . $agencia . ' (ZONA ' . $zona . ')'; ?>"
+                                        style="background-color: #fdf5f6;">
+                                        <span class="reinc-valor" style="color:#ccc; font-size:0.85rem;">⋯</span>
                                     </td>
 
                                 <?php endforeach; ?>
@@ -664,8 +592,8 @@ if (isset($resultados['actual'])) {
                             <td class="ea-td-num td-dif <?php echo $clase_tot_dif; ?>">
                                 <?php echo $tot_dif !== 0 ? $signo_tot . number_format($tot_dif) : '-'; ?>
                             </td>
-                            <td class="ea-td-num" style="background-color: #f8d7da; color: #842029; font-weight: bold;">
-                                <?php echo number_format($totales_columnas_reinc[$anomalia]); ?>
+                            <td class="ea-td-num reinc-total" data-anomalia="<?php echo htmlspecialchars($anomalia); ?>" style="background-color: #f8d7da; color: #842029; font-weight: bold;">
+                                <span class="reinc-total-valor" style="color:#ccc;">⋯</span>
                             </td>
                         <?php endforeach; ?>
 
@@ -844,7 +772,7 @@ if (isset($resultados['actual'])) {
         if (!table) return;
 
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('l', 'pt', 'a4'); // Horizontal (Landscape), puntos, tamaño A4
+        const doc = new jsPDF('l', 'pt', 'a4');
 
         doc.setFontSize(14);
         doc.text(titulo, 40, 40);
@@ -872,7 +800,152 @@ if (isset($resultados['actual'])) {
 
         doc.save(nombreArchivo);
     }
+
+    // ─── CARGA ASÍNCRONA DE REINCIDENTES ─────────────────────────────────────
+    // Usa AbortController para limitar el tiempo de espera y cancelar
+    // cualquier request anterior antes de iniciar uno nuevo.
+    // ─────────────────────────────────────────────────────────────────────────
+    let reincController = null; // guarda el controlador activo para poder cancelarlo
+
+    function cargarReincidentes() {
+        // Cancelar cualquier fetch anterior que siga corriendo
+        if (reincController) {
+            reincController.abort();
+        }
+        reincController = new AbortController();
+        const signal = reincController.signal;
+
+        // Timeout de 35 segundos para no colgar el navegador
+        const timeoutId = setTimeout(() => reincController.abort(), 35000);
+
+        const params = new URLSearchParams(window.location.search);
+        const url = 'get_reincidentes_zona.php?' + params.toString();
+
+        // Poner spinners en todas las celdas reinc mientras carga
+        document.querySelectorAll('.reinc-valor').forEach(s => {
+            s.textContent = '⋯'; s.style.color = '#ccc'; s.style.fontSize = '0.85rem';
+        });
+        document.querySelectorAll('.reinc-total-valor').forEach(s => {
+            s.textContent = '⋯'; s.style.color = '#ccc';
+        });
+
+        fetch(url, { signal })
+            .then(r => {
+                clearTimeout(timeoutId);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(json => {
+                if (!json.ok) throw new Error('Respuesta inválida');
+
+                const data = json.data;
+                const totalesPorAnomalia = {};
+
+                document.querySelectorAll('.reinc-cell').forEach(td => {
+                    const zona     = td.dataset.zona;
+                    const agencia  = td.dataset.agencia;
+                    const anomalia = td.dataset.anomalia;
+                    const tabla    = td.dataset.tabla;
+                    const tablacomp= td.dataset.tablacomp;
+                    const titulo   = td.dataset.titulo;
+                    const ci       = td.dataset.ciclo_inicio;
+                    const cf       = td.dataset.ciclo_fin;
+                    const ci2      = td.dataset.ciclo_inicio_2;
+                    const cf2      = td.dataset.ciclo_fin_2;
+
+                    const val = (data[zona] && data[zona][agencia] && data[zona][agencia][anomalia])
+                                 ? parseInt(data[zona][agencia][anomalia]) : 0;
+
+                    totalesPorAnomalia[anomalia] = (totalesPorAnomalia[anomalia] || 0) + val;
+
+                    const span = td.querySelector('.reinc-valor');
+                    if (val > 0) {
+                        td.style.fontWeight = '600';
+                        td.style.color = '#dc3545';
+                        const link = document.createElement('a');
+                        link.href = 'javascript:void(0)';
+                        link.className = 'ea-detail-trigger';
+                        link.style.color = '#dc3545';
+                        link.dataset.modo       = 'reincidente';
+                        link.dataset.tabla      = tabla;
+                        link.dataset.tablacomp  = tablacomp;
+                        link.dataset.agencia    = agencia;
+                        link.dataset.zona       = zona;
+                        link.dataset.ciclo_inicio   = ci;
+                        link.dataset.ciclo_fin      = cf;
+                        link.dataset.ciclo_inicio_2 = ci2;
+                        link.dataset.ciclo_fin_2    = cf2;
+                        link.dataset.titulo     = titulo;
+                        link.textContent        = val.toLocaleString();
+                        link.addEventListener('click', abrirModalDesdeLink);
+                        td.innerHTML = '';
+                        td.appendChild(link);
+                    } else {
+                        if (span) {
+                            span.style.color    = '#e4a1a8';
+                            span.style.fontSize = '';
+                            span.textContent    = '0';
+                        }
+                    }
+                });
+
+                // Actualizar totales
+                document.querySelectorAll('.reinc-total').forEach(td => {
+                    const anomalia = td.dataset.anomalia;
+                    const total    = totalesPorAnomalia[anomalia] || 0;
+                    const span     = td.querySelector('.reinc-total-valor');
+                    if (span) { span.style.color = '#842029'; span.textContent = total.toLocaleString(); }
+                });
+            })
+            .catch(err => {
+                clearTimeout(timeoutId);
+                if (err.name === 'AbortError') {
+                    // Cancelado a propósito (timeout o nuevo filtro) — no mostrar error
+                    return;
+                }
+                // Error real: mostrar guión
+                document.querySelectorAll('.reinc-valor').forEach(s => {
+                    s.textContent = '—'; s.style.color = '#adb5bd'; s.style.fontSize = '';
+                });
+                document.querySelectorAll('.reinc-total-valor').forEach(s => {
+                    s.textContent = '—'; s.style.color = '#adb5bd';
+                });
+            });
+    }
+
+    // Lanzar al cargar la página
+    cargarReincidentes();
+
+    // Cancelar el fetch en curso cuando el usuario aplica un nuevo filtro
+    // (evita que el fetch anterior cuelgue la navegación)
+    document.querySelector('form[method="GET"]')?.addEventListener('submit', () => {
+        if (reincController) reincController.abort();
+    });
+
+    function abrirModalDesdeLink() {
+        const modal     = document.getElementById('ea-modal');
+        const modalBody = document.getElementById('ea-modal-body');
+        const modalTitle= document.getElementById('ea-modal-title');
+        const tabla      = this.dataset.tabla;
+        const tablacomp  = this.dataset.tablacomp || '';
+        const modo       = this.dataset.modo || 'normal';
+        const agencia    = this.dataset.agencia;
+        const zona       = this.dataset.zona;
+        const c_i        = this.dataset.ciclo_inicio;
+        const c_f        = this.dataset.ciclo_fin;
+        const c_i2       = this.dataset.ciclo_inicio_2;
+        const c_f2       = this.dataset.ciclo_fin_2;
+        const titulo     = this.dataset.titulo;
+
+        modalTitle.textContent = 'Detalle: ' + titulo;
+        modalBody.innerHTML = '<div style="text-align:center;padding:40px;"><p>Consultando registros...</p></div>';
+        modal.style.display = 'block';
+
+        fetch(`get_detalle_anomalia.php?tabla=${tabla}&tablacomp=${tablacomp}&modo=${modo}&agencia=${agencia}&zona=${zona}&ciclo_inicio=${c_i}&ciclo_fin=${c_f}&ciclo_inicio_2=${c_i2}&ciclo_fin_2=${c_f2}`)
+            .then(r => r.text())
+            .then(html => { modalBody.innerHTML = html; })
+            .catch(() => { modalBody.innerHTML = '<p style="color:red;">Error al cargar.</p>'; });
+    }
 </script>
 </body>
 </html>
-

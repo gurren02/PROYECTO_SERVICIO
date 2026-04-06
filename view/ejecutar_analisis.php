@@ -68,16 +68,18 @@ foreach ($sufijos as $periodo_key => $sufijo) {
     }
 }
 
-// 5. MOTOR DE CONSULTAS
+// 5. MOTOR DE CONSULTAS OPTIMIZADO
+// OPTIMIZACIÓN: Una sola 'SHOW TABLES' al inicio en vez de SHOW TABLES LIKE por cada anomalía.
+$stmt_all_tables = $pdo->query("SHOW TABLES");
+$todas_las_tablas = array_flip($stmt_all_tables->fetchAll(PDO::FETCH_COLUMN));
+
 $zonas_disponibles  = [];
 $ciclos_disponibles = [];
 $tablas_involucradas = [];
 
 foreach ($anomalias as $anomalia) {
     $nombre_tabla = $anomalia . $sufijos['actual'];
-    $stmt_check = $pdo->prepare("SHOW TABLES LIKE ?");
-    $stmt_check->execute([$nombre_tabla]);
-    if ($stmt_check->rowCount() > 0) {
+    if (isset($todas_las_tablas[$nombre_tabla])) {
         $tablas_involucradas[] = $nombre_tabla;
         try {
             // Obtener zonas únicas
@@ -105,9 +107,8 @@ if (!empty($tablas_involucradas)) {
 foreach ($sufijos as $periodo_key => $sufijo) {
     foreach ($anomalias as $anomalia) {
         $nombre_tabla = $anomalia . $sufijo;
-        $stmt_check = $pdo->prepare("SHOW TABLES LIKE ?");
-        $stmt_check->execute([$nombre_tabla]);
-        if ($stmt_check->rowCount() > 0) {
+        // Verificación en memoria O(1) — sin llamada a BD
+        if (isset($todas_las_tablas[$nombre_tabla])) {
             try {
                 $where_sql = "WHERE 1=1";
                 $parametros_sql = [];

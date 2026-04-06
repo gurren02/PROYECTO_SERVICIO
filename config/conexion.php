@@ -9,8 +9,9 @@ $pass   = '';
 
 try {
     // Intento 1: Conectar a la red de Docker (El host se llama 'db')
+    // connect_timeout=1 → en XAMPP, falla en máximo 1 segundo en vez de esperar el timeout TCP del sistema (puede ser 10–20s)
     $host = 'db';
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $user, $pass);
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4;connect_timeout=1", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
 } catch (PDOException $e) {
