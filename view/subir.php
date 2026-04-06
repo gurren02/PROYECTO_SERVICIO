@@ -172,6 +172,7 @@ $pre_mes  = isset($_GET['mes'])  ? (int)$_GET['mes']  : date('m');
                         <option value="correcciones_de_lecturas" <?php echo ($pre_tipo === 'correcciones_de_lecturas') ? 'selected' : ''; ?>>Correcciones de Lecturas</option>
                         <option value="anomalias_pendientes" <?php echo ($pre_tipo === 'anomalias_pendientes') ? 'selected' : ''; ?>>Anomalías Pendientes</option>
                         <option value="sin_facturar" <?php echo ($pre_tipo === 'sin_facturar') ? 'selected' : ''; ?>>Sin Facturar</option>
+                        <option value="cargas_directas" <?php echo ($pre_tipo === 'cargas_directas') ? 'selected' : ''; ?>>Cargas Directas</option>
                     </select>
                 </div>
 

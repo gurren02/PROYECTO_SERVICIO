@@ -29,9 +29,10 @@ $p3_mes  = $p1_mes - 2;
 $p3_anio = $p1_anio;
 if ($p3_mes <= 0) { $p3_mes += 12; $p3_anio -= 1; }
 
+$tipo_comp = isset($_GET['comp']) && $_GET['comp'] === 'anual' ? 'anual' : 'bimestre';
+
 $sufijos = [
-        'actual'   => $p1_anio . str_pad($p1_mes, 2, '0', STR_PAD_LEFT),
-        'bimestre' => $p3_anio . str_pad($p3_mes, 2, '0', STR_PAD_LEFT)
+        'actual'   => $p1_anio . str_pad($p1_mes, 2, '0', STR_PAD_LEFT)
 ];
 
 function obtenerNombreMes($num) {
@@ -42,8 +43,20 @@ function obtenerNombreMes($num) {
 
 $meses_abrev = [1=>'ENE',2=>'FEB',3=>'MAR',4=>'ABR',5=>'MAY',6=>'JUN',
         7=>'JUL',8=>'AGO',9=>'SEP',10=>'OCT',11=>'NOV',12=>'DIC'];
-$th_actual   = $meses_abrev[$p1_mes];
-$th_bimestre = $meses_abrev[$p3_mes];
+
+if ($tipo_comp === 'anual') {
+    $p2_mes = $p1_mes;
+    $p2_anio = $p1_anio - 1;
+    $sufijos['bimestre'] = $p2_anio . str_pad($p2_mes, 2, '0', STR_PAD_LEFT);
+    $th_actual   = (string)$p1_anio;
+    $th_bimestre = (string)$p2_anio;
+    $lbl_comp = obtenerNombreMes($p2_mes).' '.$p2_anio;
+} else {
+    $sufijos['bimestre'] = $p3_anio . str_pad($p3_mes, 2, '0', STR_PAD_LEFT);
+    $th_actual   = $meses_abrev[$p1_mes];
+    $th_bimestre = $meses_abrev[$p3_mes];
+    $lbl_comp = obtenerNombreMes($p3_mes).' '.$p3_anio;
+}
 
 // --- GENERACIÓN DE TÍTULO DINÁMICO MEJORADA PARA 2 RANGOS ---
 $rango1 = "";
@@ -77,7 +90,7 @@ $mapa_agencias = [
 ];
 
 $anomalias = ['cancelaciones','estimaciones','consumos_cero','servicios_sin_medicion',
-        'correcciones_de_lecturas','anomalias_pendientes','sin_facturar'];
+        'correcciones_de_lecturas','anomalias_pendientes','sin_facturar','cargas_directas'];
 
 $resultados = [];
 $combinaciones_existentes = [];
@@ -194,11 +207,82 @@ foreach ($sufijos as $periodo_key => $sufijo) {
     }
 }
 
+// ==========================================
+// CÁLCULO DE REINCIDENTES
+// ==========================================
+foreach ($anomalias as $anomalia) {
+    if (!isset($sufijos['actual']) || !isset($sufijos['bimestre'])) continue;
+    $tabla_actual = $anomalia . $sufijos['actual'];
+    $tabla_comp   = $anomalia . $sufijos['bimestre'];
+    
+    $stmt_c1 = $pdo->prepare("SHOW TABLES LIKE ?"); $stmt_c1->execute([$tabla_actual]);
+    $stmt_c2 = $pdo->prepare("SHOW TABLES LIKE ?"); $stmt_c2->execute([$tabla_comp]);
+
+    if ($stmt_c1->rowCount() > 0 && $stmt_c2->rowCount() > 0) {
+        try {
+            $where_sql = "WHERE 1=1";
+            $parametros_sql = [];
+
+            if ($filtro_zona !== '')  {
+                $where_sql .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
+                $parametros_sql[] = (int)$filtro_zona;
+            }
+
+            $condiciones_ciclo = [];
+            if ($ciclo_inicio !== '' && $ciclo_fin !== '') {
+                $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) BETWEEN ? AND ?";
+                $parametros_sql[] = (int)$ciclo_inicio; $parametros_sql[] = (int)$ciclo_fin;
+            } elseif ($ciclo_inicio !== '') {
+                $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) = ?";
+                $parametros_sql[] = (int)$ciclo_inicio;
+            }
+
+            if ($ciclo_inicio_2 !== '' && $ciclo_fin_2 !== '') {
+                $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) BETWEEN ? AND ?";
+                $parametros_sql[] = (int)$ciclo_inicio_2; $parametros_sql[] = (int)$ciclo_fin_2;
+            } elseif ($ciclo_inicio_2 !== '') {
+                $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) = ?";
+                $parametros_sql[] = (int)$ciclo_inicio_2;
+            }
+
+            if (count($condiciones_ciclo) > 0) {
+                $where_sql .= " AND (" . implode(" OR ", $condiciones_ciclo) . ")";
+            }
+
+            // JOIN CON REINCIDENTES BASADO EN RPU
+            $query_reinc = "SELECT TRIM(`Zona`) as zona_bd, UPPER(TRIM(`$columna_agencia`)) as letra_bd, COUNT(DISTINCT TRIM(`Rpu`)) as total 
+                      FROM `$tabla_actual` $where_sql 
+                      AND TRIM(`Rpu`) IN (SELECT TRIM(`Rpu`) FROM `$tabla_comp` WHERE `Rpu` IS NOT NULL AND TRIM(`Rpu`) != '')
+                      GROUP BY TRIM(`Zona`), UPPER(TRIM(`$columna_agencia`))";
+
+            $stmt_data = $pdo->prepare($query_reinc);
+            $stmt_data->execute($parametros_sql);
+
+            while ($fila = $stmt_data->fetch(PDO::FETCH_ASSOC)) {
+                $zona_bd = $fila['zona_bd'];
+                $letra_bd = $fila['letra_bd'];
+
+                if($zona_bd !== '' && $zona_bd !== null) {
+                    if (array_key_exists($letra_bd, $mapa_agencias)) $nombre_real = $mapa_agencias[$letra_bd];
+                    elseif (in_array($letra_bd, $mapa_agencias)) $nombre_real = $letra_bd;
+                    else $nombre_real = 'OTRA';
+
+                    if(!isset($resultados['reincidentes'][$zona_bd][$nombre_real][$anomalia])) {
+                        $resultados['reincidentes'][$zona_bd][$nombre_real][$anomalia] = 0;
+                    }
+                    $resultados['reincidentes'][$zona_bd][$nombre_real][$anomalia] += (int)$fila['total'];
+                }
+            }
+        } catch (PDOException $e) {}
+    }
+}
+
 // 5. ORDENAMIENTO
 $lista_zonas = array_keys($combinaciones_existentes);
 sort($lista_zonas, SORT_NUMERIC);
 
-foreach ($sufijos as $periodo_key => $sufijo) {
+$tipos_res = array_merge(array_keys($sufijos), ['reincidentes']);
+foreach ($tipos_res as $periodo_key) {
     foreach ($lista_zonas as $z) {
         foreach (array_keys($combinaciones_existentes[$z]) as $a) {
             foreach ($anomalias as $anomalia) {
@@ -237,10 +321,23 @@ if (isset($resultados['actual'])) {
         .ea-form__group--rango input { width: 70px; }
 
         .ea-table-wrapper { overflow-x: auto; }
-        .ea-table { min-width: 1600px; }
+        .ea-table { min-width: 1800px; table-layout: auto !important; }
 
-        /* FIX DE AGENCIA: Evita que el texto de las agencias se corte o se salte de línea */
-        .ea-td-agencia, .ea-th-agencia { white-space: nowrap !important; min-width: 130px; padding-left: 15px !important;}
+        /* Estilos específicos para ZONA y AGENCIA en este reporte */
+        .ea-td-agencia, .ea-th-agencia { 
+            white-space: nowrap !important; 
+            overflow: visible !important; 
+            text-overflow: clip !important;
+            padding: 10px 15px !important;
+            width: auto !important;
+            min-width: 100px;
+        }
+        
+        /* Columna AGENCIA específica para darle un poco más de aire */
+        th.ea-th-agencia:nth-child(2), 
+        td.ea-td-agencia:nth-child(2) {
+            min-width: 150px !important;
+        }
 
         .b-left { border-left: 2px solid #dee2e6 !important; }
         .th-sub { font-size: 0.75rem !important; font-weight: 600; color: #555; background: #f8f9fa; }
@@ -265,7 +362,7 @@ if (isset($resultados['actual'])) {
             </a>
             <div>
                 <h1 class="ea-page-title">Reporte Unificado: Nivel Zona</h1>
-                <p class="ea-page-subtitle">Comparativa: <?php echo obtenerNombreMes($p1_mes).' '.$p1_anio; ?> vs <?php echo obtenerNombreMes($p3_mes).' '.$p3_anio; ?></p>
+                <p class="ea-page-subtitle">Comparativa: <?php echo obtenerNombreMes($p1_mes).' '.$p1_anio; ?> vs <?php echo $lbl_comp; ?></p>
             </div>
         </div>
         <button onclick="window.print()" class="ea-btn-print">
@@ -274,20 +371,35 @@ if (isset($resultados['actual'])) {
     </div>
 
     <div class="ea-card ea-filters-card">
-        <div class="ea-card__header">
-            <span class="material-symbols-rounded">filter_alt</span> Filtros de consulta
-            <?php if($filtro_zona !== '' || $ciclo_inicio !== '' || $ciclo_inicio_2 !== ''): ?>
-                <div class="ea-filter-tags">
-                    <?php if($filtro_zona !== ''): ?>
-                        <span class="ea-tag">Zona: <?php echo htmlspecialchars($filtro_zona); ?></span>
-                    <?php endif; ?>
-                    <?php if($rango1 !== '' || $rango2 !== ''): ?>
-                        <span class="ea-tag">
-                            Ciclos: <?php echo htmlspecialchars($rango1 . ($rango1 && $rango2 ? ' y ' : '') . $rango2); ?>
-                        </span>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
+        <div class="ea-card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="material-symbols-rounded">filter_alt</span> Filtros de consulta
+                <?php if($filtro_zona !== '' || $ciclo_inicio !== '' || $ciclo_inicio_2 !== ''): ?>
+                    <div class="ea-filter-tags" style="margin-left: 10px;">
+                        <?php if($filtro_zona !== ''): ?>
+                            <span class="ea-tag">Zona: <?php echo htmlspecialchars($filtro_zona); ?></span>
+                        <?php endif; ?>
+                        <?php if($rango1 !== '' || $rango2 !== ''): ?>
+                            <span class="ea-tag">
+                                Ciclos: <?php echo htmlspecialchars($rango1 . ($rango1 && $rango2 ? ' y ' : '') . $rango2); ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+            
+            <div style="display: flex; gap: 5px; align-items: center;">
+                <a href="?m=<?php echo $p1_mes; ?>&a=<?php echo $p1_anio; ?>&comp=bimestre<?php echo ($filtro_zona?'&zona='.$filtro_zona:'').($ciclo_inicio?'&ciclo_inicio='.$ciclo_inicio:'').($ciclo_fin?'&ciclo_fin='.$ciclo_fin:'').($ciclo_inicio_2?'&ciclo_inicio_2='.$ciclo_inicio_2:'').($ciclo_fin_2?'&ciclo_fin_2='.$ciclo_fin_2:''); ?>" 
+                   style="padding: 6px 15px; font-size: 0.85rem; font-weight: 600; border-radius: 20px; text-decoration: none; transition: 0.2s; 
+                   <?php echo $tipo_comp === 'bimestre' ? 'background-color:#0d6efd; color:white; border: 1px solid #0d6efd;' : 'background-color:#fff; color:#495057; border: 1px solid #ced4da;'; ?>">
+                    Bimestral
+                </a>
+                <a href="?m=<?php echo $p1_mes; ?>&a=<?php echo $p1_anio; ?>&comp=anual<?php echo ($filtro_zona?'&zona='.$filtro_zona:'').($ciclo_inicio?'&ciclo_inicio='.$ciclo_inicio:'').($ciclo_fin?'&ciclo_fin='.$ciclo_fin:'').($ciclo_inicio_2?'&ciclo_inicio_2='.$ciclo_inicio_2:'').($ciclo_fin_2?'&ciclo_fin_2='.$ciclo_fin_2:''); ?>" 
+                   style="padding: 6px 15px; font-size: 0.85rem; font-weight: 600; border-radius: 20px; text-decoration: none; transition: 0.2s; 
+                   <?php echo $tipo_comp === 'anual' ? 'background-color:#0d6efd; color:white; border: 1px solid #0d6efd;' : 'background-color:#fff; color:#495057; border: 1px solid #ced4da;'; ?>">
+                    Anual
+                </a>
+            </div>
         </div>
         <div class="ea-card__body">
             <div class="ea-info-summary" style="display: flex; gap: 20px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--ea-border);">
@@ -310,6 +422,7 @@ if (isset($resultados['actual'])) {
             <form method="GET" action="" class="ea-form" style="flex-wrap: wrap; display: flex; gap: 20px;">
                 <input type="hidden" name="m" value="<?php echo $p1_mes; ?>">
                 <input type="hidden" name="a" value="<?php echo $p1_anio; ?>">
+                <input type="hidden" name="comp" value="<?php echo htmlspecialchars($tipo_comp); ?>">
 
                 <div class="ea-form__group">
                     <label class="ea-form__label" for="zona"><span class="material-symbols-rounded">location_on</span> Zona</label>
@@ -324,7 +437,7 @@ if (isset($resultados['actual'])) {
                 </div>
 
                 <div class="ea-form__group">
-                    <label class="ea-form__label"><span class="material-symbols-rounded">cycle</span> Rango 1</label>
+                    <label class="ea-form__label"><span class="material-symbols-rounded">cycle</span> Rango 1 (Impar)</label>
                     <div class="ea-form__group--rango">
                         <select id="ciclo_inicio" name="ciclo_inicio" class="ea-form__control">
                             <option value=""></option>
@@ -343,7 +456,7 @@ if (isset($resultados['actual'])) {
                 </div>
 
                 <div class="ea-form__group">
-                    <label class="ea-form__label"><span class="material-symbols-rounded">add_circle</span> Rango 2 (Opcional)</label>
+                    <label class="ea-form__label"><span class="material-symbols-rounded">add_circle</span> Rango 2 (Par)</label>
                     <div class="ea-form__group--rango">
                         <select id="ciclo_inicio_2" name="ciclo_inicio_2" class="ea-form__control">
                             <option value=""></option>
@@ -378,7 +491,7 @@ if (isset($resultados['actual'])) {
             <table class="ea-table">
                 <thead>
                 <tr>
-                    <th colspan="26" class="ea-table__head-main" style="padding: 15px; text-align: center; font-size: 1rem; color: #333;">
+                    <th colspan="37" class="ea-table__head-main" style="padding: 15px; text-align: center; font-size: 1rem; color: #333;">
                         <?php echo $titulo_reporte; ?>
                     </th>
                 </tr>
@@ -388,7 +501,7 @@ if (isset($resultados['actual'])) {
                     <th rowspan="2" class="ea-th-agencia" style="vertical-align: middle; background-color: #e9ecef; border-right: 2px solid #dee2e6;">AGENCIA</th>
 
                     <?php foreach ($anomalias as $anomalia): ?>
-                        <th colspan="3" class="b-left" style="text-align: center; background-color: #e9ecef; color: #333;">
+                        <th colspan="4" class="b-left" style="text-align: center; background-color: #e9ecef; color: #333;">
                             <?php echo strtoupper(str_replace('_', ' ', $anomalia)); ?>
                         </th>
                     <?php endforeach; ?>
@@ -403,6 +516,7 @@ if (isset($resultados['actual'])) {
                         <th class="th-sub b-left"><?php echo $th_actual; ?></th>
                         <th class="th-sub"><?php echo $th_bimestre; ?></th>
                         <th class="th-sub">DIF</th>
+                        <th class="th-sub" style="color: #dc3545; background-color: #f8d7da;">REINC.</th>
                     <?php endforeach; ?>
 
                     <th class="th-sub b-left" style="background-color: #495057; color: white;"><?php echo $th_actual; ?></th>
@@ -412,11 +526,12 @@ if (isset($resultados['actual'])) {
                 </thead>
                 <tbody>
                 <?php if (empty($lista_zonas)): ?>
-                    <tr><td colspan="26" style="text-align:center; padding: 30px;">No se encontraron datos de Zonas y Agencias para los filtros seleccionados.</td></tr>
+                    <tr><td colspan="37" style="text-align:center; padding: 30px;">No se encontraron datos de Zonas y Agencias para los filtros seleccionados.</td></tr>
                 <?php else: ?>
                     <?php
                     $totales_columnas_actual = array_fill_keys($anomalias, 0);
                     $totales_columnas_bimestre = array_fill_keys($anomalias, 0);
+                    $totales_columnas_reinc = array_fill_keys($anomalias, 0);
                     $gran_defecto_actual = 0;
                     $gran_defecto_bimestre = 0;
 
@@ -452,6 +567,9 @@ if (isset($resultados['actual'])) {
 
                                     $clase_dif = $diferencia > 0 ? 'dif-pos' : ($diferencia < 0 ? 'dif-neg' : 'dif-zero');
                                     $signo = $diferencia > 0 ? '+' : '';
+                                    
+                                    $val_reinc = isset($resultados['reincidentes'][$zona][$agencia][$anomalia]) ? $resultados['reincidentes'][$zona][$agencia][$anomalia] : 0;
+                                    $totales_columnas_reinc[$anomalia] += $val_reinc;
                                     ?>
 
                                     <td class="b-left ea-td-num <?php echo $val_actual > 0 ? 'ea-td-num--val' : ''; ?>">
@@ -491,6 +609,25 @@ if (isset($resultados['actual'])) {
                                     <td class="ea-td-num td-dif <?php echo $clase_dif; ?>">
                                         <?php echo $diferencia !== 0 ? $signo . number_format($diferencia) : '-'; ?>
                                     </td>
+                                    <td class="ea-td-num" style="background-color: #fdf5f6; font-weight: 600; color: #dc3545;">
+                                        <?php if ($val_reinc > 0): ?>
+                                            <a href="javascript:void(0)" class="ea-detail-trigger" 
+                                               data-modo="reincidente"
+                                               data-tabla="<?php echo $anomalia . $sufijos['actual']; ?>" 
+                                               data-tablacomp="<?php echo $anomalia . $sufijos['bimestre']; ?>" 
+                                               data-agencia="<?php echo $agencia; ?>" 
+                                               data-zona="<?php echo $zona; ?>"
+                                               data-ciclo_inicio="<?php echo htmlspecialchars($ciclo_inicio); ?>"
+                                               data-ciclo_fin="<?php echo htmlspecialchars($ciclo_fin); ?>"
+                                               data-ciclo_inicio_2="<?php echo htmlspecialchars($ciclo_inicio_2); ?>"
+                                               data-ciclo_fin_2="<?php echo htmlspecialchars($ciclo_fin_2); ?>"
+                                               data-titulo="REINCIDENTES - <?php echo strtoupper(str_replace('_', ' ', $anomalia)) . ' - ' . $agencia . ' (ZONA ' . $zona . ')'; ?>" style="color: #dc3545;">
+                                                <?php echo number_format($val_reinc); ?>
+                                            </a>
+                                        <?php else: ?>
+                                            <span style="color: #e4a1a8;">0</span>
+                                        <?php endif; ?>
+                                    </td>
 
                                 <?php endforeach; ?>
 
@@ -527,6 +664,9 @@ if (isset($resultados['actual'])) {
                             <td class="ea-td-num td-dif <?php echo $clase_tot_dif; ?>">
                                 <?php echo $tot_dif !== 0 ? $signo_tot . number_format($tot_dif) : '-'; ?>
                             </td>
+                            <td class="ea-td-num" style="background-color: #f8d7da; color: #842029; font-weight: bold;">
+                                <?php echo number_format($totales_columnas_reinc[$anomalia]); ?>
+                            </td>
                         <?php endforeach; ?>
 
                         <?php
@@ -552,7 +692,17 @@ if (isset($resultados['actual'])) {
     <div class="ea-modal__content">
         <div class="ea-modal__header">
             <h3 id="ea-modal-title">Detalle de Anomalías</h3>
-            <span class="ea-modal__close material-symbols-rounded">close</span>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <button onclick="exportarPDF()" style="background: none; border: none; cursor: pointer; color: #d9534f; display: flex; align-items: center; gap: 5px; font-weight: 500;">
+                    <span class="material-symbols-rounded">picture_as_pdf</span>
+                    Exportar PDF
+                </button>
+                <button onclick="exportarCSV()" style="background: none; border: none; cursor: pointer; color: var(--ea-primary); display: flex; align-items: center; gap: 5px; font-weight: 500;">
+                    <span class="material-symbols-rounded">download</span>
+                    Exportar CSV
+                </button>
+                <span class="ea-modal__close material-symbols-rounded">close</span>
+            </div>
         </div>
         <div class="ea-modal__body" id="ea-modal-body">
             <div style="text-align: center; padding: 40px;">
@@ -609,6 +759,8 @@ if (isset($resultados['actual'])) {
     }
 </style>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Actualizar total
@@ -625,6 +777,8 @@ if (isset($resultados['actual'])) {
         document.querySelectorAll('.ea-detail-trigger').forEach(trigger => {
             trigger.addEventListener('click', function() {
                 const tabla = this.dataset.tabla;
+                const tablacomp = this.dataset.tablacomp || '';
+                const modo = this.dataset.modo || 'normal';
                 const agencia = this.dataset.agencia;
                 const zona = this.dataset.zona;
                 const c_i  = this.dataset.ciclo_inicio;
@@ -637,7 +791,7 @@ if (isset($resultados['actual'])) {
                 modalBody.innerHTML = '<div style="text-align: center; padding: 40px;"><p>Consultando registros...</p></div>';
                 modal.style.display = 'block';
 
-                fetch(`get_detalle_anomalia.php?tabla=${tabla}&agencia=${agencia}&zona=${zona}&ciclo_inicio=${c_i}&ciclo_fin=${c_f}&ciclo_inicio_2=${c_i2}&ciclo_fin_2=${c_f2}`)
+                fetch(`get_detalle_anomalia.php?tabla=${tabla}&tablacomp=${tablacomp}&modo=${modo}&agencia=${agencia}&zona=${zona}&ciclo_inicio=${c_i}&ciclo_fin=${c_f}&ciclo_inicio_2=${c_i2}&ciclo_fin_2=${c_f2}`)
                     .then(response => response.text())
                     .then(html => {
                         modalBody.innerHTML = html;
@@ -651,6 +805,73 @@ if (isset($resultados['actual'])) {
         closeBtn.onclick = () => modal.style.display = 'none';
         window.onclick = (event) => { if (event.target == modal) modal.style.display = 'none'; }
     });
+
+    function exportarCSV() {
+        const titulo = document.getElementById('ea-modal-title').innerText.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const table = document.querySelector('#ea-modal-body table');
+        if (!table) return;
+
+        let csv = [];
+        const rows = table.querySelectorAll('tr');
+        
+        for (let i = 0; i < rows.length; i++) {
+            const row = [];
+            const cols = rows[i].querySelectorAll('td, th');
+            for (let j = 0; j < cols.length; j++) {
+                let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, "").replace(/(\s\s+)/gm, ' ');
+                data = data.replace(/"/g, '""');
+                row.push('"' + data + '"');
+            }
+            csv.push(row.join(','));
+        }
+
+        const csvContent = "\uFEFF" + csv.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", titulo + ".csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportarPDF() {
+        const titulo = document.getElementById('ea-modal-title').innerText;
+        const nombreArchivo = titulo.replace(/[^a-z0-9]/gi, '_').toLowerCase() + ".pdf";
+        const table = document.querySelector('#ea-modal-body table');
+        if (!table) return;
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'pt', 'a4'); // Horizontal (Landscape), puntos, tamaño A4
+
+        doc.setFontSize(14);
+        doc.text(titulo, 40, 40);
+
+        doc.autoTable({
+            html: table,
+            startY: 50,
+            theme: 'grid',
+            styles: {
+                fontSize: 3.5,
+                cellPadding: 0.5,
+                overflow: 'linebreak'
+            },
+            headStyles: {
+                fillColor: [52, 58, 64],
+                textColor: 255,
+                fontSize: 4,
+                halign: 'center'
+            },
+            alternateRowStyles: {
+                fillColor: [245, 245, 245]
+            },
+            margin: { top: 50, right: 10, bottom: 20, left: 10 }
+        });
+
+        doc.save(nombreArchivo);
+    }
 </script>
 </body>
 </html>

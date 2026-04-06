@@ -54,7 +54,7 @@ $mapa_agencias = [
 ];
 
 $anomalias = ['cancelaciones','estimaciones','consumos_cero','servicios_sin_medicion',
-        'correcciones_de_lecturas','anomalias_pendientes','sin_facturar'];
+        'correcciones_de_lecturas','anomalias_pendientes','sin_facturar','cargas_directas'];
 
 $resultados = [];
 $total_registros_analisis = 0;
@@ -304,6 +304,7 @@ foreach ($resultados['actual'] as $agencia_data) {
                         <th>CORREC. LECTURAS</th>
                         <th>ANOMALÍAS PEND.</th>
                         <th>SIN FACTURAR</th>
+                        <th>CARGAS DIRECTAS</th>
                         <th class="ea-th-defecto">DEFECTO</th>
                     </tr>
                     </thead>
@@ -354,15 +355,23 @@ foreach ($resultados['actual'] as $agencia_data) {
 
 </main>
 
-<!-- Modal para detalles -->
 <div id="ea-modal" class="ea-modal">
     <div class="ea-modal__content">
         <div class="ea-modal__header">
             <h3 id="ea-modal-title">Detalle de Anomalías</h3>
-            <span class="ea-modal__close material-symbols-rounded">close</span>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <button onclick="exportarPDF()" style="background: none; border: none; cursor: pointer; color: #d9534f; display: flex; align-items: center; gap: 5px; font-weight: 500;">
+                    <span class="material-symbols-rounded">picture_as_pdf</span>
+                    Exportar PDF
+                </button>
+                <button onclick="exportarCSV()" style="background: none; border: none; cursor: pointer; color: var(--ea-primary); display: flex; align-items: center; gap: 5px; font-weight: 500;">
+                    <span class="material-symbols-rounded">download</span>
+                    Exportar CSV
+                </button>
+                <span class="ea-modal__close material-symbols-rounded">close</span>
+            </div>
         </div>
         <div class="ea-modal__body" id="ea-modal-body">
-            <!-- Aquí se cargará la tabla vía AJAX -->
             <div style="text-align: center; padding: 40px;">
                 <p>Cargando detalles...</p>
             </div>
@@ -418,6 +427,8 @@ foreach ($resultados['actual'] as $agencia_data) {
     }
 </style>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Actualizar total
@@ -457,7 +468,73 @@ foreach ($resultados['actual'] as $agencia_data) {
         closeBtn.onclick = () => modal.style.display = 'none';
         window.onclick = (event) => { if (event.target == modal) modal.style.display = 'none'; }
     });
+
+    function exportarCSV() {
+        const titulo = document.getElementById('ea-modal-title').innerText.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const table = document.querySelector('#ea-modal-body table');
+        if (!table) return;
+
+        let csv = [];
+        const rows = table.querySelectorAll('tr');
+        
+        for (let i = 0; i < rows.length; i++) {
+            const row = [];
+            const cols = rows[i].querySelectorAll('td, th');
+            for (let j = 0; j < cols.length; j++) {
+                let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, "").replace(/(\s\s+)/gm, ' ');
+                data = data.replace(/"/g, '""');
+                row.push('"' + data + '"');
+            }
+            csv.push(row.join(','));
+        }
+
+        const csvContent = "\uFEFF" + csv.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", titulo + ".csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportarPDF() {
+        const titulo = document.getElementById('ea-modal-title').innerText;
+        const nombreArchivo = titulo.replace(/[^a-z0-9]/gi, '_').toLowerCase() + ".pdf";
+        const table = document.querySelector('#ea-modal-body table');
+        if (!table) return;
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'pt', 'a4'); // Horizontal (Landscape), puntos, tamaño A4
+
+        doc.setFontSize(14);
+        doc.text(titulo, 40, 40);
+
+        doc.autoTable({
+            html: table,
+            startY: 50,
+            theme: 'grid',
+            styles: {
+                fontSize: 3.5,
+                cellPadding: 0.5,
+                overflow: 'linebreak'
+            },
+            headStyles: {
+                fillColor: [52, 58, 64],
+                textColor: 255,
+                fontSize: 4,
+                halign: 'center'
+            },
+            alternateRowStyles: {
+                fillColor: [245, 245, 245]
+            },
+            margin: { top: 50, right: 10, bottom: 20, left: 10 }
+        });
+
+        doc.save(nombreArchivo);
+    }
 </script>
 </body>
 </html>
-

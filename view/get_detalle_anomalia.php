@@ -6,6 +6,8 @@ include "../src/seguridad.php";
 require "../config/conexion.php";
 
 $tabla   = isset($_GET['tabla'])   ? preg_replace('/[^a-zA-Z0-9_]/', '', $_GET['tabla']) : '';
+$tablacomp = isset($_GET['tablacomp']) ? preg_replace('/[^a-zA-Z0-9_]/', '', $_GET['tablacomp']) : '';
+$modo    = isset($_GET['modo'])    ? trim($_GET['modo']) : 'normal';
 $agencia = isset($_GET['agencia']) ? trim($_GET['agencia']) : '';
 $zona    = isset($_GET['zona'])    ? trim($_GET['zona'])    : '';
 
@@ -81,6 +83,10 @@ try {
 
     if (!empty($condiciones_ciclo)) {
         $where .= " AND (" . implode(" OR ", $condiciones_ciclo) . ")";
+    }
+
+    if ($modo === 'reincidente' && $tablacomp !== '') {
+        $where .= " AND TRIM(`Rpu`) IN (SELECT TRIM(`Rpu`) FROM `$tablacomp` WHERE `Rpu` IS NOT NULL AND TRIM(`Rpu`) != '')";
     }
 
     $stmt = $pdo->prepare("SELECT * FROM `$tabla` $where LIMIT 500");
