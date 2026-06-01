@@ -5,6 +5,11 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 include "../src/seguridad.php";
 
+if (!isset($_SESSION['rol']) || $_SESSION['rol'] !== 'admin') {
+    header("Location: index.php");
+    exit();
+}
+
 // ==========================================
 // 2. CONFIGURACIÓN DE LA CONEXIÓN UNIVERSAL
 // ==========================================
@@ -46,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['eliminar_id'])) {
 // ==========================================
 // 4. OBTENER TODOS LOS USUARIOS CON PDO
 // ==========================================
-$stmt_all = $pdo->query("SELECT id, nombre_completo, rpe, departamento, userlog, correo_recuperacion FROM usuarios ORDER BY id ASC");
+$stmt_all = $pdo->query("SELECT id, nombre_completo, rpe, departamento, userlog, correo_recuperacion, rol, zona FROM usuarios ORDER BY id ASC");
 // Guardamos todos los resultados en un arreglo
 $usuarios = $stmt_all->fetchAll(PDO::FETCH_ASSOC);
 
@@ -111,6 +116,8 @@ $usuarios = $stmt_all->fetchAll(PDO::FETCH_ASSOC);
                     <th>Departamento</th>
                     <th>Usuario (login)</th>
                     <th>Correo recuperación</th>
+                    <th>Rol</th>
+                    <th>Zona</th>
                     <th>Acciones</th>
                 </tr>
                 </thead>
@@ -126,7 +133,7 @@ $usuarios = $stmt_all->fetchAll(PDO::FETCH_ASSOC);
                                 <?php echo htmlspecialchars($fila['nombre_completo'] ?? '—'); ?>
                                 <?php if ($fila['userlog'] === $userlog_sesion): ?>
                                     <span class="usr-badge usr-badge--you">Tú</span>
-                                <?php endif; ?>
+                                  <?php endif; ?>
                             </td>
                             <td><?php echo !empty($fila['rpe']) ? htmlspecialchars($fila['rpe']) : '<span class="usr-null">NULL</span>'; ?></td>
                             <td><?php echo !empty($fila['departamento']) ? htmlspecialchars($fila['departamento']) : '<span class="usr-null">NULL</span>'; ?></td>
@@ -134,6 +141,14 @@ $usuarios = $stmt_all->fetchAll(PDO::FETCH_ASSOC);
                                 <code class="usr-code"><?php echo htmlspecialchars($fila['userlog']); ?></code>
                             </td>
                             <td><?php echo !empty($fila['correo_recuperacion']) ? htmlspecialchars($fila['correo_recuperacion']) : '<span class="usr-null">NULL</span>'; ?></td>
+                            <td>
+                                <span class="usr-badge" style="padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; <?php echo ($fila['rol'] === 'admin') ? 'background: #fee2e2; color: #dc2626;' : 'background: #dbeafe; color: #1d4ed8;'; ?>">
+                                    <?php echo htmlspecialchars($fila['rol'] ?? 'usuario'); ?>
+                                </span>
+                            </td>
+                            <td>
+                                <?php echo !empty($fila['zona']) ? '<code class="usr-code" style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 600;">' . htmlspecialchars($fila['zona']) . '</code>' : '<span class="usr-null">—</span>'; ?>
+                            </td>
                             <td>
                                 <?php if ($fila['userlog'] !== $userlog_sesion): ?>
                                     <form method="POST" action=""

@@ -24,31 +24,58 @@
 
         <a href="subir.php"
            class="sidebar__item <?php echo ($pagina_actual==='subir.php') ? 'sidebar__item--active' : ''; ?>"
-           data-label="Subir">
+           data-label="Cargar">
             <span class="material-symbols-rounded sidebar__icon">upload_file</span>
-            <span class="sidebar__label">Subir</span>
+            <span class="sidebar__label">Cargar</span>
         </a>
 
-        <a href="tablas.php"
-           class="sidebar__item <?php echo ($pagina_actual==='tablas.php') ? 'sidebar__item--active' : ''; ?>"
-           data-label="Tablas">
-            <span class="material-symbols-rounded sidebar__icon">table_chart</span>
-            <span class="sidebar__label">Tablas</span>
-        </a>
 
-        <a href="preparar_analisis.php"
-           class="sidebar__item <?php echo ($pagina_actual==='calcular.php') ? 'sidebar__item--active' : ''; ?>"
-           data-label="Calcular">
-            <span class="material-symbols-rounded sidebar__icon">calculate</span>
-            <span class="sidebar__label">Calcular</span>
-        </a>
 
+        <?php 
+        $active_reportes = in_array($pagina_actual, ['preparar_analisis.php', 'ejecutar_analisis_zona.php', 'ejecutar_analisis.php', 'detalle_estimaciones.php']);
+        $active_comparacion = ($pagina_actual === 'comparacion.php');
+        $active_falsos = ($pagina_actual === 'falsos.php');
+        $active_calcular = $active_reportes || $active_comparacion || $active_falsos;
+        ?>
+        <div class="sidebar__item-wrapper <?php echo $active_calcular ? 'sidebar__item-wrapper--active' : ''; ?>">
+            <div class="sidebar__item" onclick="toggleCalcularSubmenu(event)" data-label="Calcular" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <span class="material-symbols-rounded sidebar__icon">calculate</span>
+                    <span class="sidebar__label">Calcular</span>
+                </div>
+                <span class="material-symbols-rounded sidebar__arrow" id="calcularArrow">keyboard_arrow_right</span>
+            </div>
+            
+            <div class="sidebar__submenu" id="calcularSubmenu">
+                <a href="falsos.php" 
+                   class="sidebar__subitem <?php echo $active_falsos ? 'sidebar__subitem--active' : ''; ?>"
+                   data-label="Falsos">
+                    <span class="material-symbols-rounded" style="font-size: 18px;">gpp_bad</span>
+                    <span class="sidebar__label">FALSOS</span>
+                </a>
+                <a href="comparacion.php" 
+                   class="sidebar__subitem <?php echo $active_comparacion ? 'sidebar__subitem--active' : ''; ?>"
+                   data-label="Comparación">
+                    <span class="material-symbols-rounded" style="font-size: 18px;">compare_arrows</span>
+                    <span class="sidebar__label">COMPARACION</span>
+                </a>
+                <a href="preparar_analisis.php" 
+                   class="sidebar__subitem <?php echo $active_reportes ? 'sidebar__subitem--active' : ''; ?>"
+                   data-label="Reportes">
+                    <span class="material-symbols-rounded" style="font-size: 18px;">assessment</span>
+                    <span class="sidebar__label">REPORTES</span>
+                </a>
+            </div>
+        </div>
+
+        <?php if (isset($_SESSION['rol']) && $_SESSION['rol'] === 'admin'): ?>
         <a href="usuarios.php"
            class="sidebar__item <?php echo ($pagina_actual==='usuarios.php') ? 'sidebar__item--active' : ''; ?>"
            data-label="Usuarios">
             <span class="material-symbols-rounded sidebar__icon">manage_accounts</span>
             <span class="sidebar__label">Usuarios</span>
         </a>
+        <?php endif; ?>
     </nav>
 
     <!-- Footer: info de usuario + cerrar sesión -->
@@ -89,6 +116,16 @@
     // 1. Al cargar la página, le decimos al body que el menú inicia ABIERTO
     document.addEventListener("DOMContentLoaded", function() {
         document.body.classList.add('con-sidebar-abierto');
+        
+        // Si estamos en una página del submenu de Calcular, abrirlo por defecto
+        const submenu = document.getElementById('calcularSubmenu');
+        const arrow = document.getElementById('calcularArrow');
+        const hasActiveSubitem = submenu && submenu.querySelector('.sidebar__subitem--active');
+        if (hasActiveSubitem) {
+            submenu.classList.add('sidebar__submenu--open');
+            submenu.style.maxHeight = submenu.scrollHeight + "px";
+            if (arrow) arrow.style.transform = "rotate(90deg)";
+        }
     });
 
     function toggleSidebar() {
@@ -100,8 +137,57 @@
         document.body.classList.toggle('con-sidebar-abierto', isOpen);
 
         icon.textContent = isOpen ? 'chevron_left' : 'chevron_right';
+
+        // Si se cierra la sidebar, cerramos también el submenu
+        if (!isOpen) {
+            const submenu = document.getElementById('calcularSubmenu');
+            const arrow = document.getElementById('calcularArrow');
+            if (submenu) {
+                submenu.classList.remove('sidebar__submenu--open');
+                submenu.style.maxHeight = "0px";
+            }
+            if (arrow) {
+                arrow.style.transform = "rotate(0deg)";
+            }
+        } else {
+            // Si se abre y estamos en una página del submenu, lo abrimos
+            const submenu = document.getElementById('calcularSubmenu');
+            const arrow = document.getElementById('calcularArrow');
+            const hasActiveSubitem = submenu && submenu.querySelector('.sidebar__subitem--active');
+            if (hasActiveSubitem) {
+                submenu.classList.add('sidebar__submenu--open');
+                submenu.style.maxHeight = submenu.scrollHeight + "px";
+                if (arrow) arrow.style.transform = "rotate(90deg)";
+            }
+        }
     }
 
     function toggleMenu() { toggleSidebar(); }
+
+    function toggleCalcularSubmenu(e) {
+        const sidebar = document.getElementById('sidebar');
+        const submenu = document.getElementById('calcularSubmenu');
+        const arrow = document.getElementById('calcularArrow');
+        
+        if (!sidebar.classList.contains('sidebar--open')) {
+            // Si la sidebar está colapsada, la abrimos
+            toggleSidebar();
+            // Y luego abrimos el submenu
+            setTimeout(() => {
+                submenu.classList.add('sidebar__submenu--open');
+                submenu.style.maxHeight = submenu.scrollHeight + "px";
+                if (arrow) arrow.style.transform = "rotate(90deg)";
+            }, 300); // Esperar la transición de la sidebar
+        } else {
+            const isOpen = submenu.classList.toggle('sidebar__submenu--open');
+            if (isOpen) {
+                submenu.style.maxHeight = submenu.scrollHeight + "px";
+                if (arrow) arrow.style.transform = "rotate(90deg)";
+            } else {
+                submenu.style.maxHeight = "0px";
+                if (arrow) arrow.style.transform = "rotate(0deg)";
+            }
+        }
+    }
 </script>
 

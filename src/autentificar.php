@@ -39,6 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION["usuario_actual"]  = $datos_usuario['userlog'];
         $_SESSION['nombre_completo'] = $datos_usuario['nombre_completo'];
         $_SESSION['userlog']         = $datos_usuario['userlog'];
+        $_SESSION['rol']             = $datos_usuario['rol'];
+        $_SESSION['zona']            = $datos_usuario['zona'];
 
         // Limpiamos los errores o intentos fallidos previos si existían
         unset($_SESSION['error_login']);

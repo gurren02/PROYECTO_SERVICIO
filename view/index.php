@@ -68,6 +68,7 @@ include "../src/seguridad.php";
             <span class="material-symbols-rounded idx-card__arrow">arrow_forward</span>
         </a>
 
+        <?php if (isset($_SESSION['rol']) && $_SESSION['rol'] === 'admin'): ?>
         <a href="usuarios.php" class="idx-card idx-card--users">
             <div class="idx-card__glow"></div>
             <div class="idx-card__icon-wrap">
@@ -79,6 +80,7 @@ include "../src/seguridad.php";
             </div>
             <span class="material-symbols-rounded idx-card__arrow">arrow_forward</span>
         </a>
+        <?php endif; ?>
 
     </div>
 

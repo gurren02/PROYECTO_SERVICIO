@@ -20,10 +20,20 @@ $p1_mes  = isset($_GET['m']) ? (int)$_GET['m'] : (int)date('n');
 $p1_anio = isset($_GET['a']) ? (int)$_GET['a'] : (int)date('Y');
 $tipo_comp      = (isset($_GET['comp']) && $_GET['comp'] === 'anual') ? 'anual' : 'bimestre';
 $filtro_zona    = isset($_GET['zona'])           ? trim($_GET['zona'])           : '';
-$ciclo_inicio   = isset($_GET['ciclo_inicio'])   ? trim($_GET['ciclo_inicio'])   : '';
-$ciclo_fin      = isset($_GET['ciclo_fin'])      ? trim($_GET['ciclo_fin'])      : '';
-$ciclo_inicio_2 = isset($_GET['ciclo_inicio_2']) ? trim($_GET['ciclo_inicio_2']) : '';
-$ciclo_fin_2    = isset($_GET['ciclo_fin_2'])    ? trim($_GET['ciclo_fin_2'])    : '';
+
+$filtro_ciclo = [];
+if (isset($_GET['ciclo'])) {
+    if (is_array($_GET['ciclo'])) {
+        $filtro_ciclo = $_GET['ciclo'];
+    } else {
+        $filtro_ciclo = array_filter(explode(',', (string)$_GET['ciclo']), 'strlen');
+    }
+}
+
+// ICF TOTAL: Ignora filtros de ciclo
+if (isset($_GET['icf_total']) && $_GET['icf_total'] === '1') {
+    $filtro_ciclo = [];
+}
 
 // Calcular sufijos
 $p3_mes = $p1_mes - 2; $p3_anio = $p1_anio;
@@ -47,24 +57,18 @@ $anomalias = ['cancelaciones','estimaciones','consumos_cero','servicios_sin_medi
 // Una sola verificación de tablas
 $todas_las_tablas = array_flip($pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN));
 
-// Helper: construir WHERE de ciclos
-function buildCicloCol($ciclo_inicio, $ciclo_fin, $ciclo_inicio_2, $ciclo_fin_2, &$params) {
-    $conds = [];
-    if ($ciclo_inicio !== '' && $ciclo_fin !== '') {
-        $conds[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) BETWEEN ? AND ?";
-        $params[] = (int)$ciclo_inicio; $params[] = (int)$ciclo_fin;
-    } elseif ($ciclo_inicio !== '') {
-        $conds[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) = ?";
-        $params[] = (int)$ciclo_inicio;
+// Helper: construir WHERE de ciclo
+function buildCicloCol($filtro_ciclo, &$params) {
+    if (!empty($filtro_ciclo)) {
+        $placeholders = [];
+        foreach ($filtro_ciclo as $c) {
+            $params[] = (int)$c;
+            $placeholders[] = '?';
+        }
+        $ph = implode(',', $placeholders);
+        return " AND CAST(TRIM(`Ciclo`) AS UNSIGNED) IN ($ph)";
     }
-    if ($ciclo_inicio_2 !== '' && $ciclo_fin_2 !== '') {
-        $conds[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) BETWEEN ? AND ?";
-        $params[] = (int)$ciclo_inicio_2; $params[] = (int)$ciclo_fin_2;
-    } elseif ($ciclo_inicio_2 !== '') {
-        $conds[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) = ?";
-        $params[] = (int)$ciclo_inicio_2;
-    }
-    return empty($conds) ? '' : " AND (" . implode(" OR ", $conds) . ")";
+    return '';
 }
 
 $resultado = []; // [zona][agencia][anomalia] = total
@@ -77,8 +81,6 @@ foreach ($anomalias as $anomalia) {
 
     try {
         // ── PASO 1: Cargar el SET de RPUs de la tabla de comparación ─────────────
-        // SELECT solo la columna Rpu — mucho más rápido que un JOIN completo.
-        // Verificamos si existe la columna Rpu primero.
         $cols_comp = $pdo->query("SHOW COLUMNS FROM `$tabla_comp` LIKE 'Rpu'")->fetchAll();
         $cols_actual = $pdo->query("SHOW COLUMNS FROM `$tabla_actual` LIKE 'Rpu'")->fetchAll();
         if (empty($cols_comp) || empty($cols_actual)) continue;
@@ -88,7 +90,6 @@ foreach ($anomalias as $anomalia) {
              WHERE `Rpu` IS NOT NULL AND TRIM(`Rpu`) != ''
              LIMIT 200000"
         );
-        // HashSet: O(1) lookup, sin consumir RAM excesiva
         $rpu_set = [];
         while ($rpu = $stmt_comp->fetchColumn()) {
             $rpu_set[$rpu] = true;
@@ -104,7 +105,7 @@ foreach ($anomalias as $anomalia) {
             $where .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
             $params[] = (int)$filtro_zona;
         }
-        $where .= buildCicloCol($ciclo_inicio, $ciclo_fin, $ciclo_inicio_2, $ciclo_fin_2, $params);
+        $where .= buildCicloCol($filtro_ciclo, $params);
 
         $stmt_actual = $pdo->prepare(
             "SELECT TRIM(`Rpu`) as rpu, TRIM(`Zona`) as zona, UPPER(TRIM(`Agencia`)) as agencia

@@ -11,6 +11,10 @@ require "../config/conexion.php";
 // 3. LÓGICA DE PERIODOS Y TIPOS ESPERADOS
 $busqueda_activa = false;
 
+$stmt_db         = $pdo->query("SHOW TABLES");
+$todas_las_tablas = $stmt_db->fetchAll(PDO::FETCH_COLUMN);
+$todas_las_tablas_flipped = array_flip($todas_las_tablas);
+
 $tipos_esperados = [
         'cancelaciones',
         'estimaciones',
@@ -32,91 +36,14 @@ $nombres_meses = [
         7 => 'Julio', 8 => 'Agosto', 9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre'
 ];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mes_objetivo'], $_POST['anio_objetivo'])) {
+if (isset($_REQUEST['mes_objetivo'], $_REQUEST['anio_objetivo'])) {
     $busqueda_activa = true;
 
-    // ---> INCIO LÓGICA DE SUBIDA (MODAL) <---
-    $mensaje_upload = "";
-    if (isset($_FILES['archivo'])) {
-        $tipo_defecto = preg_replace('/[^a-zA-Z0-9_]/', '_', $_POST['tipo_defecto']);
-        $anio = (int)$_POST['anio'];
-        $mes  = (int)$_POST['mes'];
+    // ---> LA LÓGICA DE SUBIDA (MODAL) AHORA ES ASÍNCRONA VÍA AJAX (CHUNKING NIVEL 3) <---
 
-        $archivo_tmp = $_FILES['archivo']['tmp_name'];
-        $nombre_archivo_original = $_FILES['archivo']['name'];
-        $ext = strtolower(pathinfo($nombre_archivo_original, PATHINFO_EXTENSION));
 
-        if ($ext === 'csv') {
-            $directorio_destino = 'tablas/';
-            if (!is_dir($directorio_destino)) { mkdir($directorio_destino, 0777, true); }
-            $nombre_archivo_fisico = uniqid($tipo_defecto . '_') . '.csv';
-            $ruta_final = $directorio_destino . $nombre_archivo_fisico;
-
-            if (move_uploaded_file($archivo_tmp, $ruta_final)) {
-                if (($handle = fopen($ruta_final, "r")) !== FALSE) {
-                    $headers = fgetcsv($handle, 10000, ",");
-                    if ($headers) {
-                        $columnas_sql = []; $columnas_limpias = [];
-                        foreach ($headers as $index => $header) {
-                            $col_name = preg_replace('/[^a-zA-Z0-9_]/', '_', trim($header));
-                            if (empty($col_name)) $col_name = "columna_" . $index;
-                            $columnas_limpias[] = $col_name;
-                            $columnas_sql[] = "`$col_name` TEXT";
-                        }
-                        $mes_formateado = str_pad($mes, 2, "0", STR_PAD_LEFT);
-                        $nombre_tabla = strtolower($tipo_defecto) . $anio . $mes_formateado;
-
-                        $pdo->exec("DROP TABLE IF EXISTS `$nombre_tabla`");
-                        $create_table_query = "CREATE TABLE IF NOT EXISTS `$nombre_tabla` (
-                                `id_registro` INT AUTO_INCREMENT PRIMARY KEY,
-                                `anio_carga` INT, `mes_carga` INT,
-                                " . implode(", ", $columnas_sql) . "
-                            )";
-                        $pdo->exec($create_table_query);
-
-                        $placeholders = implode(",", array_fill(0, count($columnas_limpias), "?"));
-                        $insert_query = "INSERT INTO `$nombre_tabla` 
-                                    (`anio_carga`, `mes_carga`, " . implode(", ", array_map(function($c) { return "`$c`"; }, $columnas_limpias)) . ") 
-                                    VALUES (?, ?, $placeholders)";
-                        $stmt = $pdo->prepare($insert_query);
-
-                        $filas_insertadas = 0;
-                        while (($data = fgetcsv($handle, 10000, ",")) !== FALSE) {
-                            if (count($data) === count($columnas_limpias)) {
-                                $params = array_merge([$anio, $mes], $data);
-                                $stmt->execute($params);
-                                $filas_insertadas++;
-                            }
-                        }
-                        fclose($handle);
-
-                        $pdo->exec("CREATE TABLE IF NOT EXISTS `registro_archivos` (
-                            `id_archivo` INT AUTO_INCREMENT PRIMARY KEY, `nombre_tabla` VARCHAR(100) NOT NULL,
-                            `tipo_registro` VARCHAR(100) NOT NULL, `anio_asociado` INT NOT NULL, `mes_asociado` INT NOT NULL,
-                            `nombre_archivo_original` VARCHAR(255) NOT NULL, `nombre_archivo_fisico` VARCHAR(255) NOT NULL,
-                            `fecha_subida` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        )");
-                        $stmt_registro = $pdo->prepare("INSERT INTO `registro_archivos` (nombre_tabla, tipo_registro, anio_asociado, mes_asociado, nombre_archivo_original, nombre_archivo_fisico) VALUES (?, ?, ?, ?, ?, ?)");
-                        $stmt_registro->execute([$nombre_tabla, $tipo_defecto, $anio, $mes, $nombre_archivo_original, $nombre_archivo_fisico]);
-
-                        $mensaje_upload = "<div style='padding:15px; background-color:#d1e7dd; color:#0f5132; margin-bottom:20px; border-radius:8px;'>Archivo procesado correctamente. Se insertaron $filas_insertadas filas en la base de datos.</div>";
-                    } else {
-                        $mensaje_upload = "<div style='padding:15px; background-color:#f8d7da; color:#842029; margin-bottom:20px; border-radius:8px;'>Archivo CSV vacío o con formato incorrecto.</div>";
-                    }
-                } else {
-                    $mensaje_upload = "<div style='padding:15px; background-color:#f8d7da; color:#842029; margin-bottom:20px; border-radius:8px;'>No se pudo leer el archivo.</div>";
-                }
-            } else {
-                $mensaje_upload = "<div style='padding:15px; background-color:#f8d7da; color:#842029; margin-bottom:20px; border-radius:8px;'>Error al subir archivo.</div>";
-            }
-        } else {
-            $mensaje_upload = "<div style='padding:15px; background-color:#f8d7da; color:#842029; margin-bottom:20px; border-radius:8px;'>Sube un archivo .csv válido.</div>";
-        }
-    }
-    // ---> FIN LÓGICA DE SUBIDA (MODAL) <---
-
-    $p1_mes  = (int)$_POST['mes_objetivo'];
-    $p1_anio = (int)$_POST['anio_objetivo'];
+    $p1_mes  = (int)$_REQUEST['mes_objetivo'];
+    $p1_anio = (int)$_REQUEST['anio_objetivo'];
 
     $p2_mes  = $p1_mes;
     $p2_anio = $p1_anio - 1;
@@ -132,8 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mes_objetivo'], $_POS
     $sufijo_p2 = $p2_anio . str_pad($p2_mes, 2, '0', STR_PAD_LEFT);
     $sufijo_p3 = $p3_anio . str_pad($p3_mes, 2, '0', STR_PAD_LEFT);
 
-    $stmt_db         = $pdo->query("SHOW TABLES");
-    $todas_las_tablas = $stmt_db->fetchAll(PDO::FETCH_COLUMN);
+
 
     // Asegurar que la tabla de registro existe
     $pdo->exec("CREATE TABLE IF NOT EXISTS `registro_archivos` (
@@ -173,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mes_objetivo'], $_POS
     <title>Preparar Análisis</title>
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/preparar_analisis.css">
+    <link rel="stylesheet" href="../assets/ejecutar_analisis.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 </head>
 <body>
@@ -202,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mes_objetivo'], $_POS
                     </label>
                     <select name="mes_objetivo" id="mes_objetivo" class="calc-form__control" required>
                         <?php
-                        $mes_actual = isset($_POST['mes_objetivo']) ? (int)$_POST['mes_objetivo'] : (int)date('n');
+                        $mes_actual = isset($_REQUEST['mes_objetivo']) ? (int)$_REQUEST['mes_objetivo'] : (int)date('n');
                         foreach ($nombres_meses as $num => $nombre):
                             ?>
                             <option value="<?php echo $num; ?>" <?php echo ($num === $mes_actual) ? 'selected' : ''; ?>>
@@ -219,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mes_objetivo'], $_POS
                     </label>
                     <input type="number" name="anio_objetivo" id="anio_objetivo"
                            class="calc-form__control" required
-                           value="<?php echo isset($_POST['anio_objetivo']) ? (int)$_POST['anio_objetivo'] : date('Y'); ?>"
+                           value="<?php echo isset($_REQUEST['anio_objetivo']) ? (int)$_REQUEST['anio_objetivo'] : date('Y'); ?>"
                            min="2000" max="2100">
                 </div>
 
@@ -232,6 +159,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mes_objetivo'], $_POS
     </div>
 
     <?php if ($busqueda_activa): ?>
+        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+            <a href="ejecutar_analisis_zona.php?m=<?php echo $p1_mes; ?>&a=<?php echo $p1_anio; ?>"
+               class="calc-btn-generate ea-report-link" style="flex: 1; justify-content: center; background-color: #d4efdf; color: #196f3d; border: 1px solid #a9dfbf;">
+                <span class="material-symbols-rounded">map</span>
+                Reporte Nivel Zona
+            </a>
+
+            <a href="ejecutar_analisis.php?m=<?php echo $p1_mes; ?>&a=<?php echo $p1_anio; ?>"
+               class="calc-btn-generate ea-report-link" style="flex: 1; justify-content: center; background-color: #d6eaf8; color: #1b4f72; border: 1px solid #aed6f1;">
+                <span class="material-symbols-rounded">business</span>
+                Reporte Nivel Agencia
+            </a>
+
+            <a href="detalle_estimaciones.php?m=<?php echo $p1_mes; ?>&a=<?php echo $p1_anio; ?>"
+               class="calc-btn-generate ea-report-link" style="flex: 1; justify-content: center; background-color: #fcf3cf; color: #7d6608; border: 1px solid #f9e79f;">
+                <span class="material-symbols-rounded">table_chart</span>
+                Desglose de Estimaciones
+            </a>
+        </div>
 
         <div class="calc-periods">
             <div class="calc-period-chip">
@@ -257,7 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mes_objetivo'], $_POS
             </div>
         </div>
 
-        <?php if(isset($mensaje_upload) && !empty($mensaje_upload)) echo $mensaje_upload; ?>
+        <div id="ea-alert-container"></div>
 
         <div class="calc-card calc-card--table">
             <div class="calc-card__header">
@@ -340,20 +286,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mes_objetivo'], $_POS
             </div>
         </div>
 
-        <div style="display: flex; gap: 15px; margin-top: 20px;">
-            <a href="ejecutar_analisis.php?m=<?php echo $p1_mes; ?>&a=<?php echo $p1_anio; ?>"
-               class="calc-btn-generate" style="flex: 1; justify-content: center; background-color: #0d6efd;">
-                <span class="material-symbols-rounded">business</span>
-                Reporte Nivel Agencia
-            </a>
-
-            <a href="ejecutar_analisis_zona.php?m=<?php echo $p1_mes; ?>&a=<?php echo $p1_anio; ?>"
-               class="calc-btn-generate" style="flex: 1; justify-content: center; background-color: #198754;">
-                <span class="material-symbols-rounded">map</span>
-                Reporte Nivel Zona
-            </a>
-        </div>
-
     <?php endif; ?>
 
 </main>
@@ -427,6 +359,140 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mes_objetivo'], $_POS
             cerrarModalSubida();
         }
     }
+
+    // ── MD3 Loading overlay al generar reportes ─────────────────────
+    document.querySelectorAll('.ea-report-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            const overlay = document.createElement('div');
+            overlay.className = 'ea-page-overlay';
+            overlay.innerHTML = `
+                <div class="ea-page-overlay__card">
+                    <div class="ea-spinner ea-spinner--lg"></div>
+                    <span class="ea-spinner-text">Generando reporte\u2026</span>
+                    <span class="ea-spinner-subtext">Esto puede tomar unos segundos</span>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        });
+    });
+
+    // ── Nivel 3: Algoritmo de Carga Masiva por Chunks (modal form) ──────────
+    document.querySelectorAll('.subir-form').forEach(form => {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const fileInput = this.querySelector('input[type="file"]');
+            if (fileInput && fileInput.files.length === 0) return;
+
+            const overlay = document.createElement('div');
+            overlay.className = 'ea-upload-overlay';
+            overlay.innerHTML = `
+                <div class="ea-upload-overlay__card">
+                    <div class="ea-upload-icon">
+                        <span class="material-symbols-rounded">cloud_upload</span>
+                    </div>
+                    <span class="ea-spinner-text" id="progreso-texto-modal">Iniciando subida...</span>
+                    <span class="ea-spinner-subtext" id="progreso-subtexto-modal">Preparando archivo</span>
+                    <div class="ea-upload-steps">
+                        <div class="ea-upload-step active" id="m-step-1"></div>
+                        <div class="ea-upload-step" id="m-step-2"></div>
+                        <div class="ea-upload-step" id="m-step-3"></div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            const txtElement = overlay.querySelector('#progreso-texto-modal');
+            const subElement = overlay.querySelector('#progreso-subtexto-modal');
+            const step1 = overlay.querySelector('#m-step-1');
+            const step2 = overlay.querySelector('#m-step-2');
+            const step3 = overlay.querySelector('#m-step-3');
+
+            try {
+                // FASE 1: INICIALIZACIÓN
+                txtElement.innerText = "Paso 1: Iniciando";
+                subElement.innerText = "Subiendo archivo al servidor y leyendo estructura...";
+                
+                let formData = new FormData(this);
+                formData.append('action', 'init');
+
+                let initRes = await fetch('../src/api_csv_procesar.php', { method: 'POST', body: formData });
+                let initData = await initRes.json();
+                if(initData.error) throw new Error(initData.error);
+
+                const totalLineas = initData.total_lines;
+                const tmpFile = initData.tmp_file;
+                const originalName = initData.original_name;
+                
+                step1.classList.replace('active', 'done');
+                step2.classList.add('active');
+
+                // FASE 2: PROCESAMIENTO POR CHUNKS
+                txtElement.innerText = "Paso 2: Procesando datos";
+                let lineasProcesadas = 0;
+                const limitMaximo = 5000;
+
+                while (lineasProcesadas < totalLineas) {
+                    let chunkFormData = new FormData();
+                    chunkFormData.append('action', 'process_chunk');
+                    chunkFormData.append('tmp_file', tmpFile);
+                    chunkFormData.append('start', lineasProcesadas);
+                    chunkFormData.append('limit', limitMaximo);
+                    
+                    chunkFormData.append('tipo_defecto', formData.get('tipo_defecto'));
+                    chunkFormData.append('anio', formData.get('anio'));
+                    chunkFormData.append('mes', formData.get('mes'));
+
+                    let chunkRes = await fetch('../src/api_csv_procesar.php', { method: 'POST', body: chunkFormData });
+                    let chunkData = await chunkRes.json();
+                    if(chunkData.error) throw new Error(chunkData.error);
+
+                    lineasProcesadas += chunkData.processed;
+                    let porcentaje = Math.min(100, Math.round((lineasProcesadas / totalLineas) * 100));
+                    subElement.innerHTML = `<span class="ea-upload-percent">${porcentaje}%</span> Procesando... (${lineasProcesadas} de ${totalLineas} filas)`;
+                    
+                    if(chunkData.processed < limitMaximo) break;
+                }
+
+                step2.classList.replace('active', 'done');
+                step3.classList.add('active');
+
+                // FASE 3: FINALIZACIÓN
+                txtElement.innerText = "Paso 3: Finalizando";
+                subElement.innerText = "Guardando bitácora y refrescando...";
+
+                let finishFormData = new FormData();
+                finishFormData.append('action', 'finish');
+                finishFormData.append('tmp_file', tmpFile);
+                finishFormData.append('tipo_defecto', formData.get('tipo_defecto'));
+                finishFormData.append('anio', formData.get('anio'));
+                finishFormData.append('mes', formData.get('mes'));
+                finishFormData.append('original_name', originalName);
+
+                let finishRes = await fetch('../src/api_csv_procesar.php', { method: 'POST', body: finishFormData });
+                let finishData = await finishRes.json();
+                if(finishData.error) throw new Error(finishData.error);
+
+                overlay.remove();
+                cerrarModalSubida();
+                
+                // Mostrar éxito en la página y recargar para ver la nueva tabla
+                document.getElementById('ea-alert-container').innerHTML = `
+                    <div style='padding:15px; background-color:#d1e7dd; color:#0f5132; margin-bottom:20px; border-radius:8px;'>
+                        <strong>¡Éxito!</strong> Se insertaron ${lineasProcesadas} registros. Recargando...
+                    </div>`;
+                
+                setTimeout(() => window.location.reload(), 1500);
+
+            } catch (err) {
+                overlay.remove();
+                cerrarModalSubida();
+                document.getElementById('ea-alert-container').innerHTML = `
+                    <div style='padding:15px; background-color:#f8d7da; color:#842029; margin-bottom:20px; border-radius:8px;'>
+                        Error crítico: ${err.message}
+                    </div>`;
+            }
+        });
+    });
 </script>
 </body>
 </html>

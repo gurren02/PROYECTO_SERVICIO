@@ -11,14 +11,15 @@ $modo    = isset($_GET['modo'])    ? trim($_GET['modo']) : 'normal';
 $agencia = isset($_GET['agencia']) ? trim($_GET['agencia']) : '';
 $zona    = isset($_GET['zona'])    ? trim($_GET['zona'])    : '';
 
-// Parámetros de ciclo (Rango 1 y 2)
-$ciclo_i  = isset($_GET['ciclo_inicio'])   ? trim($_GET['ciclo_inicio']) : '';
-$ciclo_f  = isset($_GET['ciclo_fin'])      ? trim($_GET['ciclo_fin'])    : '';
-$ciclo_i2 = isset($_GET['ciclo_inicio_2']) ? trim($_GET['ciclo_inicio_2']) : '';
-$ciclo_f2 = isset($_GET['ciclo_fin_2'])    ? trim($_GET['ciclo_fin_2'])    : '';
-
-// Ciclo único (para nivel agencia)
-$ciclo_u  = isset($_GET['ciclo']) ? trim($_GET['ciclo']) : '';
+// Ciclo único o múltiple
+$filtro_ciclo = [];
+if (isset($_GET['ciclo'])) {
+    if (is_array($_GET['ciclo'])) {
+        $filtro_ciclo = $_GET['ciclo'];
+    } else {
+        $filtro_ciclo = array_filter(explode(',', (string)$_GET['ciclo']), 'strlen');
+    }
+}
 
 if ($tabla === '') {
     echo "Error: Tabla no especificada.";
@@ -52,37 +53,15 @@ try {
         $params[] = (int)$zona;
     }
 
-    // Lógica de Ciclos (Rangos o Único)
-    $condiciones_ciclo = [];
-    
-    // Rango 1
-    if ($ciclo_i !== '' && $ciclo_f !== '') {
-        $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) BETWEEN ? AND ?";
-        $params[] = (int)$ciclo_i;
-        $params[] = (int)$ciclo_f;
-    } elseif ($ciclo_i !== '') {
-        $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) = ?";
-        $params[] = (int)$ciclo_i;
-    }
-
-    // Rango 2
-    if ($ciclo_i2 !== '' && $ciclo_f2 !== '') {
-        $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) BETWEEN ? AND ?";
-        $params[] = (int)$ciclo_i2;
-        $params[] = (int)$ciclo_f2;
-    } elseif ($ciclo_i2 !== '') {
-        $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) = ?";
-        $params[] = (int)$ciclo_i2;
-    }
-
-    // Ciclo único (Agencia)
-    if ($ciclo_u !== '' && empty($condiciones_ciclo)) {
-        $condiciones_ciclo[] = "CAST(TRIM(`Ciclo`) AS UNSIGNED) = ?";
-        $params[] = (int)$ciclo_u;
-    }
-
-    if (!empty($condiciones_ciclo)) {
-        $where .= " AND (" . implode(" OR ", $condiciones_ciclo) . ")";
+    // Lógica de Ciclo Múltiple
+    if (!empty($filtro_ciclo)) {
+        $placeholders = [];
+        foreach ($filtro_ciclo as $c) {
+            $params[] = (int)$c;
+            $placeholders[] = '?';
+        }
+        $ph = implode(',', $placeholders);
+        $where .= " AND CAST(TRIM(`Ciclo`) AS UNSIGNED) IN ($ph)";
     }
 
     if ($modo === 'reincidente' && $tablacomp !== '') {
@@ -98,13 +77,51 @@ try {
         exit;
     }
 
+    // Calcular reincidencia histórica
+    $recurrences = [];
+    if ($modo === 'reincidente') {
+        $prefix = preg_replace('/[0-9]+$/', '', $tabla);
+        $stmt_tables = $pdo->query("SHOW TABLES LIKE '{$prefix}%'");
+        $history_tables = $stmt_tables->fetchAll(PDO::FETCH_COLUMN);
+
+        $rpus = [];
+        foreach ($filas as $fila) {
+            if (isset($fila['Rpu'])) {
+                $rpu = trim($fila['Rpu']);
+                if ($rpu !== '') {
+                    $rpus[$rpu] = true;
+                }
+            }
+        }
+        
+        if (!empty($rpus)) {
+            $rpus_str = implode(',', array_map(function($r) { return "'" . $r . "'"; }, array_keys($rpus)));
+            foreach ($history_tables as $ht) {
+                try {
+                    $q = $pdo->query("SELECT TRIM(`Rpu`) as rpu, COUNT(*) as cnt FROM `$ht` WHERE TRIM(`Rpu`) IN ($rpus_str) GROUP BY TRIM(`Rpu`)");
+                    while ($r = $q->fetch(PDO::FETCH_ASSOC)) {
+                        $rpu_val = $r['rpu'];
+                        if (!isset($recurrences[$rpu_val])) $recurrences[$rpu_val] = 0;
+                        $recurrences[$rpu_val] += (int)$r['cnt'];
+                    }
+                } catch (Exception $e) {}
+            }
+        }
+    }
+
     echo '<div class="ea-table-wrapper" style="max-height: 60vh; overflow: auto; border: 1px solid var(--ea-border); border-radius: 8px;">';
     echo '<table class="ea-table ea-table--detailed" style="font-size: 0.75rem;">';
     echo '<thead><tr class="ea-table__head-cols">';
+    if ($modo === 'reincidente') echo '<th style="text-align:center;">REINCIDENCIA</th>';
     foreach ($columnas as $col) { echo '<th>' . htmlspecialchars($col) . '</th>'; }
     echo '</tr></thead><tbody>';
     foreach ($filas as $fila) {
         echo '<tr>';
+        if ($modo === 'reincidente') {
+            $rpu = isset($fila['Rpu']) ? trim($fila['Rpu']) : '';
+            $reinc_count = isset($recurrences[$rpu]) ? $recurrences[$rpu] : 1;
+            echo '<td style="text-align:center;"><span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; background-color:#dc3545; color:white; border-radius:50%; font-weight:bold; font-size:11px;" title="Total histórico de reincidencias">'. $reinc_count . '</span></td>';
+        }
         foreach ($columnas as $col) { echo '<td>' . htmlspecialchars($fila[$col] ?? '-') . '</td>'; }
         echo '</tr>';
     }

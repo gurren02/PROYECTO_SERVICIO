@@ -158,6 +158,8 @@
 }
 
 /* ---------- Filtros ---------- */
+/* ---------- Filtros ---------- */
+.ea-filters-card { overflow: visible; position: relative; z-index: 20; }
 .ea-card__body { padding: 16px 18px; }
 
 .ea-form {
@@ -242,6 +244,170 @@
 .ea-btn--danger  { background: var(--ea-danger);   color: #fff; }
 .ea-btn--danger:hover  { background: var(--ea-danger-dk); }
 .ea-btn:active { transform: scale(.97); }
+
+/* ---------- Filtro Dropdown Checkboxes (Standard) ---------- */
+.ea-dropdown-checkboxes {
+    position: relative;
+    user-select: none;
+}
+.ea-dropdown-toggle {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 140px;
+    background: #fff;
+    transition: all 0.2s;
+}
+.ea-dropdown-toggle:hover {
+    border-color: var(--ea-primary);
+}
+.ea-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 400px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid var(--ea-border);
+    border-radius: var(--ea-radius-sm);
+    padding: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    z-index: 100;
+    margin-top: 5px;
+}
+.ea-dropdown-menu.open {
+    display: block;
+}
+.lbl-ciclo {
+    display: block;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+.lbl-ciclo:hover {
+    background: #f1f3f5;
+}
+.lbl-ciclo input {
+    margin-right: 8px;
+}
+
+/* ---------- Resumen de Información (Standard) ---------- */
+.ea-info-summary {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--ea-border);
+    flex-wrap: wrap;
+}
+.ea-info-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.ea-info-item .material-symbols-rounded {
+    color: var(--ea-primary);
+    font-size: 22px;
+}
+.ea-info-label {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--ea-muted);
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+.ea-info-value {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--ea-text);
+}
+
+/* ---------- Tags de Filtros (Standard) ---------- */
+.ea-filter-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.ea-tag {
+    background: rgba(255,255,255,0.22);
+    color: #fff;
+    border-radius: 20px;
+    padding: 2px 12px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border: 1px solid rgba(255,255,255,0.30);
+    display: inline-flex;
+    align-items: center;
+}
+/* Variante para fondo claro */
+.ea-card__header:not(.ea-card__header--actual):not(.ea-card__header--bimestre):not(.ea-card__header--ano_anterior) .ea-tag {
+    background: #f1f3f5;
+    color: var(--ea-muted);
+    border-color: #dee2e6;
+}
+
+/* ---------- Botones de Comparación (Switch / Segmented Control) ---------- */
+.ea-comp-switch {
+    display: -webkit-inline-box;
+    display: -ms-inline-flexbox;
+    display: inline-flex;
+    align-items: center;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    background-color: #f1f3f5;
+    padding: 3px;
+    border-radius: 20px;
+    -webkit-border-radius: 20px;
+    border: 1px solid #dee2e6;
+    vertical-align: middle;
+}
+.ea-comp-btn {
+    padding: 6px 18px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 17px;
+    -webkit-border-radius: 17px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    -webkit-transition: all 0.2s ease;
+    -o-transition: all 0.2s ease;
+    display: inline-block; /* Fallback para navegadores antiguos */
+    display: -webkit-inline-box;
+    display: -ms-inline-flexbox;
+    display: inline-flex;
+    align-items: center;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    justify-content: center;
+    -webkit-box-pack: center;
+    -ms-flex-pack: center;
+    text-align: center;
+    line-height: 1.4;
+    border: none;
+    cursor: pointer;
+    margin: 0 2px; /* Margen en lugar de gap para compatibilidad total */
+}
+.ea-comp-btn--active {
+    background-color: #00796B; /* Azul verdoso (Teal #00796B) premium de alta visibilidad */
+    color: #ffffff !important;
+    font-weight: 700;
+    box-shadow: 0 2px 5px rgba(0, 121, 107, 0.3);
+    -webkit-box-shadow: 0 2px 5px rgba(0, 121, 107, 0.3);
+}
+.ea-comp-btn--inactive {
+    background-color: transparent;
+    color: #495057 !important;
+}
+.ea-comp-btn--inactive:hover {
+    background-color: #e9ecef; /* Color sólido en lugar de alfa para mejor renderizado en pantallas antiguas */
+    color: #212529 !important;
+}
 
 /* ============================================================
    TABLA — layout fixed para alineación perfecta
@@ -426,4 +592,445 @@
     .ea-main            { padding: 14px 10px; }
     .ea-page-header     { flex-direction: column; }
     .ea-page-header__left { flex-wrap: wrap; }
+}
+
+/* ============================================================
+   MATERIAL DESIGN 3 — Loading Animations System
+   ============================================================ */
+
+/* ── MD3 Tokens ────────────────────────────────────────────── */
+:root {
+    --md3-primary:          #1a7a5e;
+    --md3-primary-container:#c8f5e6;
+    --md3-on-surface:       #1e2b27;
+    --md3-on-surface-var:   #6b7c78;
+    --md3-surface-cv:       #e8eeed;
+    --md3-surface-bright:   #f5f8f6;
+    --md3-outline-var:      #c4ceca;
+    --md3-elevation-1:      0 1px 3px 1px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.12);
+    --md3-elevation-3:      0 4px 8px 3px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.12);
+    --md3-shape-xl:         28px;
+    --md3-shape-lg:         16px;
+    --md3-shape-md:         12px;
+    --md3-shape-sm:         8px;
+    --md3-motion-standard:  cubic-bezier(0.2, 0, 0, 1);
+    --md3-motion-emphasized:cubic-bezier(0.05, 0.7, 0.1, 1);
+    --md3-motion-duration:  500ms;
+}
+
+/* ── Skeleton Shimmer Overlay (for tables) ─────────────────── */
+.ea-loading-overlay {
+    position: relative;
+    pointer-events: none;
+}
+
+.ea-loading-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background: linear-gradient(
+        110deg,
+        rgba(255,255,255,0) 0%,
+        rgba(255,255,255,0) 40%,
+        rgba(26,122,94,0.06) 50%,
+        rgba(255,255,255,0) 60%,
+        rgba(255,255,255,0) 100%
+    );
+    background-size: 200% 100%;
+    animation: ea-shimmer 1.6s var(--md3-motion-standard) infinite;
+    border-radius: var(--ea-radius);
+}
+
+.ea-loading-overlay tbody tr td {
+    color: transparent !important;
+    position: relative;
+}
+
+.ea-loading-overlay tbody tr td::after {
+    content: '';
+    position: absolute;
+    inset: 6px 10px;
+    background: var(--md3-surface-cv);
+    border-radius: var(--md3-shape-sm);
+    animation: ea-skeleton-pulse 1.8s var(--md3-motion-standard) infinite;
+}
+
+.ea-loading-overlay tbody tr td a,
+.ea-loading-overlay tbody tr td span {
+    visibility: hidden;
+}
+
+@keyframes ea-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+@keyframes ea-skeleton-pulse {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 1; }
+}
+
+/* ============================================================
+   MD3 CIRCULAR PROGRESS INDICATOR
+   ============================================================ */
+.ea-spinner-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    gap: 20px;
+}
+
+/*  MD3 indeterminate circular indicator — pure CSS
+    Uses a border ring that spins + a rotating clip that
+    grows/shrinks the visible arc (like stroke-dashoffset).  */
+.ea-spinner {
+    --_size: 48px;
+    --_stroke: 4px;
+    --_color: var(--md3-primary);
+    --_track: var(--md3-surface-cv);
+    width: var(--_size);
+    height: var(--_size);
+    border-radius: 50%;
+    border: var(--_stroke) solid var(--_track);
+    border-top-color: var(--_color);
+    border-right-color: var(--_color);
+    box-sizing: border-box;
+    animation: md3-spin 0.8s linear infinite;
+    position: relative;
+}
+
+/* Second arc layer for the "growing arc" MD3 effect */
+.ea-spinner::before {
+    content: '';
+    position: absolute;
+    inset: calc(var(--_stroke) * -1);
+    border-radius: 50%;
+    border: var(--_stroke) solid transparent;
+    border-bottom-color: var(--_color);
+    box-sizing: border-box;
+    animation: md3-arc-grow 2s var(--md3-motion-standard) infinite;
+}
+
+.ea-spinner--sm {
+    --_size: 24px;
+    --_stroke: 3px;
+}
+
+.ea-spinner--lg {
+    --_size: 56px;
+    --_stroke: 4.5px;
+}
+
+@keyframes md3-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes md3-arc-grow {
+    0%   { opacity: 0; transform: rotate(0deg); }
+    15%  { opacity: 1; }
+    50%  { opacity: 1; transform: rotate(180deg); }
+    85%  { opacity: 1; }
+    100% { opacity: 0; transform: rotate(360deg); }
+}
+
+/* MD3 label */
+.ea-spinner-text {
+    font-family: var(--ea-font, 'Segoe UI', system-ui, sans-serif);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--md3-on-surface);
+    letter-spacing: 0.015em;
+    animation: md3-text-breathe 2.5s ease-in-out infinite;
+}
+
+.ea-spinner-subtext {
+    font-size: 0.85rem;
+    color: var(--md3-on-surface-var);
+    font-weight: 500;
+    margin-top: 4px;
+    animation: md3-text-breathe 2.5s ease-in-out 0.3s infinite;
+}
+
+.ea-upload-percent {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #1a8f3b; /* Verde fuerte y nítido */
+    padding: 0 4px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+@keyframes md3-text-breathe {
+    0%, 100% { opacity: 0.8; }
+    50%      { opacity: 1; }
+}
+
+/* ============================================================
+   MD3 LINEAR PROGRESS INDICATOR
+   ============================================================ */
+.ea-progress-bar-wrapper {
+    width: 200px;
+    height: 4px;
+    background: var(--md3-surface-cv);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Two-part indicator that mimics MD3's indeterminate pattern */
+.ea-progress-bar-inner {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 100%;
+    border-radius: 2px;
+    background: var(--md3-primary);
+    transform-origin: left center;
+    animation: md3-linear-indeterminate 2s var(--md3-motion-standard) infinite;
+}
+
+/* Secondary "tail" indicator */
+.ea-progress-bar-wrapper::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 100%;
+    border-radius: 2px;
+    background: var(--md3-primary);
+    opacity: 0.38;
+    transform-origin: left center;
+    animation: md3-linear-indeterminate-tail 2s var(--md3-motion-standard) 0.4s infinite;
+    transform: scaleX(0);
+}
+
+@keyframes md3-linear-indeterminate {
+    0%   { transform: translateX(-100%) scaleX(0.4); }
+    40%  { transform: translateX(20%)   scaleX(0.6); }
+    100% { transform: translateX(100%)  scaleX(0.1); }
+}
+
+@keyframes md3-linear-indeterminate-tail {
+    0%   { transform: translateX(-100%) scaleX(0.3); }
+    60%  { transform: translateX(60%)   scaleX(0.4); }
+    100% { transform: translateX(100%)  scaleX(0.08); }
+}
+
+/* ============================================================
+   MD3 WAVE DOTS (for reincidencias cells)
+   ============================================================ */
+.ea-dots-loader {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 16px;
+}
+
+.ea-dots-loader span {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--md3-primary);
+    opacity: 0.3;
+    animation: md3-dot-wave 1.4s var(--md3-motion-standard) infinite;
+}
+
+.ea-dots-loader span:nth-child(1) { animation-delay: 0s; }
+.ea-dots-loader span:nth-child(2) { animation-delay: 0.16s; }
+.ea-dots-loader span:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes md3-dot-wave {
+    0%, 100% {
+        transform: translateY(0) scale(0.8);
+        opacity: 0.3;
+    }
+    30% {
+        transform: translateY(-6px) scale(1.15);
+        opacity: 1;
+    }
+    60% {
+        transform: translateY(2px) scale(0.9);
+        opacity: 0.5;
+    }
+}
+
+/* ============================================================
+   MD3 FADE-IN / CONTAINER TRANSFORM
+   ============================================================ */
+.ea-fade-in {
+    animation: md3-container-in 0.4s var(--md3-motion-emphasized);
+}
+
+@keyframes md3-container-in {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* ============================================================
+   MD3 FULL-PAGE LOADING OVERLAY
+   ============================================================ */
+.ea-page-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: md3-scrim-in 0.3s var(--md3-motion-emphasized);
+}
+
+.ea-page-overlay__card {
+    background: #fff;
+    border-radius: var(--md3-shape-xl);
+    padding: 44px 64px;
+    box-shadow: var(--md3-elevation-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    animation: md3-dialog-in 0.5s var(--md3-motion-emphasized);
+    max-width: 340px;
+    text-align: center;
+}
+
+@keyframes md3-scrim-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes md3-dialog-in {
+    from {
+        opacity: 0;
+        transform: scale(0.85) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* ============================================================
+   MD3 FILE UPLOAD LOADING OVERLAY
+   ============================================================ */
+.ea-upload-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.32);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: md3-scrim-in 0.25s var(--md3-motion-emphasized);
+}
+
+.ea-upload-overlay__card {
+    background: #fff;
+    border-radius: var(--md3-shape-xl);
+    padding: 40px 48px;
+    box-shadow: var(--md3-elevation-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    animation: md3-dialog-in 0.45s var(--md3-motion-emphasized);
+    max-width: 360px;
+    text-align: center;
+}
+
+/* Animated upload icon */
+.ea-upload-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--md3-primary-container);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    animation: md3-icon-breathe 2s ease-in-out infinite;
+}
+
+.ea-upload-icon .material-symbols-rounded {
+    font-size: 32px;
+    color: var(--md3-primary);
+    animation: md3-arrow-float 1.2s var(--md3-motion-standard) infinite;
+}
+
+/* Orbiting ring around the upload icon */
+.ea-upload-icon::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2.5px solid transparent;
+    border-top-color: var(--md3-primary);
+    border-right-color: var(--md3-primary);
+    animation: md3-spin 1.2s linear infinite;
+}
+
+@keyframes md3-icon-breathe {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.06); }
+}
+
+@keyframes md3-arrow-float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-5px); }
+}
+
+/* Upload steps tracker */
+.ea-upload-steps {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 4px;
+}
+
+.ea-upload-step {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--md3-surface-cv);
+    transition: all 0.4s var(--md3-motion-emphasized);
+}
+
+.ea-upload-step.active {
+    background: var(--md3-primary);
+    width: 24px;
+    border-radius: 4px;
+    animation: md3-step-active 0.5s var(--md3-motion-emphasized);
+}
+
+.ea-upload-step.done {
+    background: var(--md3-primary);
+}
+
+@keyframes md3-step-active {
+    from { width: 8px; border-radius: 50%; }
+    to   { width: 24px; border-radius: 4px; }
+}
+
+/* ── Hide loading overlay in print ─────────────────────────── */
+@media print {
+    .ea-loading-overlay::after,
+    .ea-spinner-container,
+    .ea-dots-loader,
+    .ea-page-overlay,
+    .ea-upload-overlay { display: none !important; }
 }

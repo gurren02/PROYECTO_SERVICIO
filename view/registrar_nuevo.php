@@ -5,6 +5,11 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 include "../src/seguridad.php";
 
+if (!isset($_SESSION['rol']) || $_SESSION['rol'] !== 'admin') {
+    header("Location: index.php");
+    exit();
+}
+
 // ==========================================
 // 2. CONFIGURACIÓN DE LA CONEXIÓN (Directa)
 // ==========================================
@@ -22,6 +27,8 @@ $form_data    = [
         'departamento'        => '',
         'userlog'             => '',
         'correo_recuperacion' => '',
+        'rol'                 => 'usuario',
+        'zona'                => '',
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registrar'])) {
@@ -34,9 +41,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registrar'])) {
     $correo_recuperacion = trim($_POST['correo_recuperacion']);
     $contrasena          = trim($_POST['contrasena']);
     $confirmar           = trim($_POST['confirmar_contrasena']);
+    $rol                 = isset($_POST['rol']) ? trim($_POST['rol']) : 'usuario';
+    $zona                = ($rol === 'admin') ? null : (isset($_POST['zona']) && trim($_POST['zona']) !== '' ? trim($_POST['zona']) : null);
 
     // Repoblar el formulario si hay error
-    $form_data = compact('nombre_completo', 'rpe', 'departamento', 'userlog', 'correo_recuperacion');
+    $form_data = compact('nombre_completo', 'rpe', 'departamento', 'userlog', 'correo_recuperacion', 'rol', 'zona');
 
     // ---- Validaciones ----
     if (empty($nombre_completo) || empty($userlog) || empty($contrasena)) {
@@ -45,6 +54,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registrar'])) {
 
     } elseif ($contrasena !== $confirmar) {
         $mensaje      = 'Las contraseñas no coinciden. Verifica e intenta de nuevo.';
+        $tipo_mensaje = 'error';
+
+    } elseif ($rol === 'usuario' && empty($zona)) {
+        $mensaje      = 'La Zona asignada es obligatoria para usuarios con el rol "Usuario".';
         $tipo_mensaje = 'error';
 
     } else {
@@ -64,9 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registrar'])) {
 
             // Actualizado para insertar con PDO (Usando los signos de interrogación por seguridad)
             $sql_insert = "INSERT INTO usuarios
-                        (nombre_completo, rpe, departamento, userlog, correo_recuperacion, contrasena, token_recuperacion)
+                        (nombre_completo, rpe, departamento, userlog, correo_recuperacion, contrasena, token_recuperacion, rol, zona)
                        VALUES
-                        (?, ?, ?, ?, ?, ?, ?)";
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt_insert = $pdo->prepare($sql_insert);
 
@@ -79,7 +92,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registrar'])) {
                     $userlog, 
                     $correo_recuperacion, 
                     $contrasena, 
-                    $token_recuperacion
+                    $token_recuperacion,
+                    $rol,
+                    $zona
                 ]);
 
                 $mensaje      = "Usuario <strong>$userlog</strong> registrado correctamente.";
@@ -91,7 +106,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registrar'])) {
                         'rpe'                 => '',
                         'departamento'        => '',
                         'userlog'             => '',
-                        'correo_recuperacion' => ''
+                        'correo_recuperacion' => '',
+                        'rol'                 => 'usuario',
+                        'zona'                => '',
                 ];
             } catch (PDOException $e) {
                 // Si algo falla en la base de datos, lo atrapamos aquí
@@ -234,6 +251,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registrar'])) {
 
                 <div class="reg-form__divider"></div>
                 <div class="reg-form__section-title">
+                    <span class="material-symbols-rounded">admin_panel_settings</span>
+                    Rol y Zona Asignada
+                </div>
+
+                <div class="reg-form__row">
+                    <div class="reg-form__group">
+                        <label class="reg-form__label" for="rol">
+                            <span class="material-symbols-rounded">manage_accounts</span>
+                            Rol de usuario <span class="reg-required-star">*</span>
+                        </label>
+                        <select id="rol" name="rol" class="reg-form__control" required onchange="toggleZonaField()">
+                            <option value="usuario" <?php echo ($form_data['rol'] === 'usuario') ? 'selected' : ''; ?>>Usuario</option>
+                            <option value="admin" <?php echo ($form_data['rol'] === 'admin') ? 'selected' : ''; ?>>Administrador</option>
+                        </select>
+                    </div>
+                    <div class="reg-form__group" id="group-zona">
+                        <label class="reg-form__label" for="zona">
+                            <span class="material-symbols-rounded">location_on</span>
+                            Zona asignada <span class="reg-required-star" id="zona-star">*</span>
+                        </label>
+                        <input type="text" id="zona" name="zona"
+                               class="reg-form__control"
+                               value="<?php echo htmlspecialchars($form_data['zona'] ?? ''); ?>"
+                               placeholder="Ej. 04">
+                    </div>
+                </div>
+
+                <div class="reg-form__divider"></div>
+                <div class="reg-form__section-title">
                     <span class="material-symbols-rounded">key</span>
                     Contraseña de acceso
                 </div>
@@ -300,6 +346,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registrar'])) {
             icon.textContent = 'visibility';
         }
     }
+
+    function toggleZonaField() {
+        const rol = document.getElementById('rol').value;
+        const groupZona = document.getElementById('group-zona');
+        const inputZona = document.getElementById('zona');
+        const star = document.getElementById('zona-star');
+        if (rol === 'admin') {
+            inputZona.value = '';
+            inputZona.disabled = true;
+            inputZona.required = false;
+            star.style.display = 'none';
+            groupZona.style.opacity = '0.5';
+        } else {
+            inputZona.disabled = false;
+            inputZona.required = true;
+            star.style.display = 'inline';
+            groupZona.style.opacity = '1';
+        }
+    }
+    document.addEventListener("DOMContentLoaded", toggleZonaField);
 </script>
 
 </body>

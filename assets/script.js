@@ -43,4 +43,5 @@ $(document).ready(function() {
     $(window).on('resize', function() {
         table.columns.adjust();
     });
-});gb
+});
+
