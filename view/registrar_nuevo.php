@@ -129,6 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registrar'])) {
     <link rel="stylesheet" href="../assets/header.css">
     <link rel="stylesheet" href="../assets/user_estilos.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
     <title>Registrar Nuevo Usuario</title>
 </head>
 <body>

@@ -106,47 +106,38 @@ function formatearRangoCiclos($arr) {
     
     $partes = [];
     
-    // Bimestrales (secuencias con paso 2)
     if (!empty($bimestrales)) {
         if (count($bimestrales) === 1) {
             $partes[] = (string)$bimestrales[0];
         } else {
-            $es_secuencia = true;
-            for ($i = 1; $i < count($bimestrales); $i++) {
-                if ($bimestrales[$i] - $bimestrales[$i-1] !== 2) {
-                    $es_secuencia = false;
-                    break;
-                }
-            }
-            if ($es_secuencia) {
-                $partes[] = min($bimestrales) . " AL " . max($bimestrales);
-            } else {
-                $partes[] = implode(", ", $bimestrales);
-            }
+            $partes[] = min($bimestrales) . " AL " . max($bimestrales);
         }
     }
     
-    // Mensuales (secuencias con paso 1)
     if (!empty($mensuales)) {
         if (count($mensuales) === 1) {
             $partes[] = (string)$mensuales[0];
         } else {
-            $es_secuencia = true;
-            for ($i = 1; $i < count($mensuales); $i++) {
-                if ($mensuales[$i] - $mensuales[$i-1] !== 1) {
-                    $es_secuencia = false;
-                    break;
-                }
-            }
-            if ($es_secuencia) {
-                $partes[] = min($mensuales) . " AL " . max($mensuales);
-            } else {
-                $partes[] = implode(", ", $mensuales);
-            }
+            $partes[] = min($mensuales) . " AL " . max($mensuales);
         }
     }
     
     return implode(" Y ", $partes);
+}
+
+function obtenerTextoRangoFiltro($ciclos_completo, $filtro_ciclo) {
+    if (empty($filtro_ciclo)) {
+        $seleccionados = $ciclos_completo;
+    } else {
+        $seleccionados = array_intersect($ciclos_completo, array_map('intval', $filtro_ciclo));
+    }
+    if (empty($seleccionados)) {
+        return "Ninguno";
+    } elseif (count($seleccionados) === 1) {
+        return (string)reset($seleccionados);
+    } else {
+        return min($seleccionados) . " AL " . max($seleccionados);
+    }
 }
 
 function obtenerNombreMes($num) {
@@ -166,7 +157,7 @@ $titulos_completos = [
 
 $mapa_agencias = [
         'A'=>'CENTRO','B'=>'NORTE','C'=>'SUR','D'=>'ORIENTE','E'=>'PONIENTE',
-        'G'=>'PROGRESO','H'=>'HUNUCMA','J'=>'UMAN','K'=>'ACANCEH','M'=>'CONKAL'
+        'F'=>'MOTUL','G'=>'PROGRESO','H'=>'HUNUCMA','J'=>'UMAN','K'=>'ACANCEH','M'=>'CONKAL'
 ];
 
 $anomalias = ['cancelaciones','estimaciones','consumos_cero','servicios_sin_medicion',
@@ -232,36 +223,128 @@ $ciclos_actuales = array_unique($ciclos_actuales);
 $ciclos_comparacion = array_unique($ciclos_comparacion);
 $ciclos_disponibles = array_unique(array_merge($ciclos_actuales, $ciclos_comparacion)); sort($ciclos_disponibles);
 
+// Mapa de ciclos disponibles por zona (para filtrado dinámico en el frontend)
+// Se consultan todos los períodos para alinear con $ciclos_disponibles
+$ciclos_por_zona = [];
+foreach ($sufijos as $_sufijo_mapa) {
+    foreach ($anomalias as $_anom_mapa) {
+        $_tabla_mapa = $_anom_mapa . $_sufijo_mapa;
+        if (!isset($todas_las_tablas[$_tabla_mapa])) continue;
+        try {
+            $_stmt_mapa = $pdo->query("SELECT DISTINCT CAST(TRIM(`Zona`) AS UNSIGNED) as z, CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$_tabla_mapa` WHERE `Zona` IS NOT NULL AND `Zona` != '' AND `Ciclo` IS NOT NULL AND `Ciclo` != '' AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))");
+            while ($_r = $_stmt_mapa->fetch(PDO::FETCH_ASSOC)) {
+                $_z = (int)$_r['z'];
+                $_c = (int)$_r['c'];
+                if (!isset($ciclos_por_zona[$_z])) $ciclos_por_zona[$_z] = [];
+                $ciclos_por_zona[$_z][$_c] = true;
+            }
+        } catch (PDOException $e) {}
+    }
+}
+foreach ($ciclos_por_zona as $_z => &$_set) {
+    $_set = array_keys($_set);
+    sort($_set);
+}
+unset($_set);
+
 $is_even_month = ($p1_mes % 2 === 0);
 $ciclos_bimestrales = [];
 $ciclos_mensuales = [];
 
 foreach ($ciclos_disponibles as $c) {
     if ($c >= 1 && $c <= 61) {
-        if ($is_even_month && $c % 2 === 0) {
-            $ciclos_bimestrales[] = $c;
-        } elseif (!$is_even_month && $c % 2 !== 0) {
+        $coincide_paridad = ($is_even_month && $c % 2 === 0) || (!$is_even_month && $c % 2 !== 0);
+        if ($coincide_paridad) {
             $ciclos_bimestrales[] = $c;
         }
-    } elseif ($c >= 62 && $c <= 80) {
+    } elseif ($c >= 62 && $c <= 84) {
         $ciclos_mensuales[] = $c;
     }
 }
 
+// Conteo de registros por ciclo en la tabla de estimaciones del periodo actual
+$conteos_por_ciclo = [];
+$tabla_estimaciones_actual = 'estimaciones' . $sufijos['actual'];
+if (isset($todas_las_tablas[$tabla_estimaciones_actual])) {
+    try {
+        $stmt_cnt = $pdo->query("SELECT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c, COUNT(*) as cnt FROM `$tabla_estimaciones_actual` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != '' GROUP BY c");
+        while ($r = $stmt_cnt->fetch(PDO::FETCH_ASSOC)) {
+            $c_val = (int)$r['c'];
+            $cnt_val = (int)$r['cnt'];
+            $conteos_por_ciclo[$c_val] = $cnt_val;
+        }
+    } catch (PDOException $e) {}
+}
+
+$ciclos_actuales_filtrados = [];
+// Caso normal: respetamos la paridad del mes actual
+$start_cycle = $is_even_month ? 2 : 1;
+for ($c = $start_cycle; $c <= 61; $c += 2) {
+    $count = isset($conteos_por_ciclo[$c]) ? $conteos_por_ciclo[$c] : 0;
+    if ($count > 8) {
+        $ciclos_actuales_filtrados[] = $c;
+    } else {
+        break;
+    }
+}
+// Ciclos mensuales (62-84): solo se incluyen si ellos mismos tienen > 8 registros en estimaciones
+for ($c = 62; $c <= 84; $c++) {
+    $count = isset($conteos_por_ciclo[$c]) ? $conteos_por_ciclo[$c] : 0;
+    if ($count > 8) {
+        $ciclos_actuales_filtrados[] = $c;
+    }
+}
+
+// Excepción Ciclo 80: Si el ciclo 79 es válido y existen datos para el ciclo 80 en cargas directas, el ciclo 80 es válido.
+if (in_array(79, $ciclos_actuales_filtrados)) {
+    $tabla_cd_actual = 'cargas_directas' . $sufijos['actual'];
+    if (isset($todas_las_tablas[$tabla_cd_actual])) {
+        try {
+            $stmt_cd_check = $pdo->prepare("SELECT COUNT(*) FROM `$tabla_cd_actual` WHERE CAST(TRIM(`Ciclo`) AS UNSIGNED) = 80");
+            $stmt_cd_check->execute();
+            if ((int)$stmt_cd_check->fetchColumn() > 0) {
+                if (!in_array(80, $ciclos_actuales_filtrados)) {
+                    $ciclos_actuales_filtrados[] = 80;
+                }
+            }
+        } catch (PDOException $e) {}
+    }
+}
+
+if (empty($ciclos_actuales_filtrados)) {
+    $ciclos_actuales_filtrados = $ciclos_actuales;
+}
+
 // Preselección de todos los ciclos que tengan valores en el mes actual (solo bimestrales por defecto)
 // Solo se ejecuta en primera carga (cuando no hay filtros aplicados, ni en sesión, ni por submit del formulario)
-$es_primera_carga = !isset($_GET['ciclo']) && !isset($_SESSION['filtro_ciclo']) && !isset($_GET['clear_filters']) && !isset($_GET['filtrado_aplicado']);
+$es_primera_carga = !isset($_GET['ciclo']) && !isset($_SESSION['filtro_ciclo']) && !isset($_GET['filtrado_aplicado']);
 if ($period_changed) {
     $es_primera_carga = true;
 }
 
 if ($es_primera_carga && empty($filtro_ciclo)) {
-    foreach ($ciclos_bimestrales as $c) {
-        if (in_array($c, $ciclos_actuales)) {
-            $filtro_ciclo[] = (string)$c;
+    foreach ($ciclos_disponibles as $c) {
+        if (in_array($c, $ciclos_actuales_filtrados)) {
+            if ($c >= 1 && $c <= 61) {
+                $coincide_paridad = ($is_even_month && $c % 2 === 0) || (!$is_even_month && $c % 2 !== 0);
+                if ($coincide_paridad) {
+                    $filtro_ciclo[] = (string)$c;
+                }
+            } elseif ($c >= 62 && $c <= 84) {
+                $filtro_ciclo[] = (string)$c;
+            }
         }
     }
 }
+
+// Filtrar los ciclos para que correspondan ÚNICAMENTE a los disponibles para la zona seleccionada
+if ($filtro_zona !== '') {
+    $ciclos_validos_filtro = $ciclos_por_zona[(int)$filtro_zona] ?? [];
+    $filtro_ciclo = array_filter($filtro_ciclo, function($c) use ($ciclos_validos_filtro) {
+        return in_array((int)$c, $ciclos_validos_filtro);
+    });
+}
+
 
 // Obtener última actualización de las tablas involucradas
 if (!empty($tablas_involucradas)) {
@@ -286,6 +369,7 @@ foreach ($sufijos as $periodo_key => $sufijo) {
                     $where_sql .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
                     $parametros_sql[] = (int)$filtro_zona;
                 }
+                $where_sql .= " AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`$columna_agencia`)) = 'F' OR UPPER(TRIM(`$columna_agencia`)) = 'MOTUL'))";
                 if (!empty($filtro_ciclo)) {
                     $placeholders = [];
                     foreach ($filtro_ciclo as $c) {
@@ -328,6 +412,7 @@ foreach ($resultados['actual'] as $agencia_data) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
     <title>Reporte Nivel Agencia</title>
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/header.css">
@@ -353,7 +438,7 @@ foreach ($resultados['actual'] as $agencia_data) {
             <div>
                 <h1 class="ea-page-title">Reporte de Resultados Nivel Agencia</h1>
                 <p class="ea-page-subtitle">
-                    Análisis comparativo — <?php echo obtenerNombreMes($p1_mes) . ' ' . $p1_anio; ?>
+                    Análisis comparativo — <span style="color: #2E7D32; font-weight: bold;"><?php echo obtenerNombreMes($p1_mes) . ' ' . $p1_anio; ?></span>
                 </p>
             </div>
         </div>
@@ -372,11 +457,14 @@ foreach ($resultados['actual'] as $agencia_data) {
             <?php 
                 $params_est = "?m=$p1_mes&a=$p1_anio";
                 if ($filtro_zona !== '') $params_est .= "&zona=" . urlencode($filtro_zona);
-                if (!empty($filtro_ciclo)) $params_est .= "&ciclo=" . urlencode(implode(",", $filtro_ciclo));
             ?>
             <a href="detalle_estimaciones.php<?php echo $params_est; ?>" class="ea-btn-switch-report" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; background-color: #fcf3cf; color: #7d6608; border: 1px solid #f9e79f; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: background 0.18s, transform 0.1s;" onmouseover="this.style.backgroundColor='#f9e79f'" onmouseout="this.style.backgroundColor='#fcf3cf'">
                 <span class="material-symbols-rounded" style="font-size: 18px;">table_chart</span>
                 Ir a Estimaciones
+            </a>
+            <a href="comparacion.php?mes_objetivo=<?php echo $p1_mes; ?>&anio_objetivo=<?php echo $p1_anio; ?><?php echo ($filtro_zona !== '') ? '&zona=' . urlencode($filtro_zona) : ''; ?>" class="ea-btn-switch-report" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; background-color: #f4fadc; color: #515d07; border: 1px solid #e4f2b1; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: background 0.18s, transform 0.1s;" onmouseover="this.style.backgroundColor='#e4f2b1'" onmouseout="this.style.backgroundColor='#f4fadc'">
+                <span class="material-symbols-rounded" style="font-size: 18px;">compare_arrows</span>
+                Ir a Comparación
             </a>
         </div>
     </div>
@@ -446,10 +534,10 @@ foreach ($resultados['actual'] as $agencia_data) {
                     </label>
                     <div class="ea-dropdown-checkboxes" style="position: relative;">
                         <div class="ea-form__control ea-dropdown-toggle" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-width: 140px; background: #fff;">
-                            <span class="ea-dropdown-text">TODOS</span>
+                            <span class="ea-dropdown-text"><?php echo htmlspecialchars(obtenerTextoRangoFiltro($ciclos_bimestrales, $filtro_ciclo)); ?></span>
                             <span class="material-symbols-rounded" style="font-size: 1.2rem; pointer-events: none;">arrow_drop_down</span>
                         </div>
-                        <div class="ea-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 400px; overflow-y: auto; background: #fff; border: 1px solid #ced4da; border-radius: 4px; padding: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10; margin-top: 5px;">
+                        <div class="ea-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 400px; overflow-y: auto; overflow-x: hidden; background: #fff; border: 1px solid #ced4da; border-radius: 4px; padding: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10; margin-top: 5px;">
                             <div style="display: flex; gap: 5px; padding: 5px; margin-bottom: 5px;">
                                 <button type="button" class="mode-rango active" style="flex:1; border: 1px solid var(--ea-primary); background: var(--ea-primary); color: #fff; border-radius: 4px; padding: 4px; cursor: pointer; font-size: 0.8rem;">Rango</button>
                                 <button type="button" class="mode-indiv" style="flex:1; border: 1px solid #ced4da; background: #f8f9fa; color: #333; border-radius: 4px; padding: 4px; cursor: pointer; font-size: 0.8rem;">Individual</button>
@@ -459,8 +547,8 @@ foreach ($resultados['actual'] as $agencia_data) {
                             </label>
                             <hr style="margin: 4px 0; border-color: #eee;">
                             <?php foreach($ciclos_bimestrales as $c): 
-                                $is_missing = !in_array($c, $ciclos_actuales);
-                                $lbl_style = $is_missing ? 'color: #d32f2f; font-weight: bold;' : '';
+                                $no_pasa_regla = !in_array($c, $ciclos_actuales_filtrados);
+                                $lbl_style = $no_pasa_regla ? 'color: #d32f2f; font-weight: bold;' : '';
                             ?>
                                 <label style="display: block; font-size: 0.85rem; cursor: pointer; padding: 5px; <?php echo $lbl_style; ?>" class="lbl-ciclo">
                                     <input type="checkbox" class="chk-ciclo" name="ciclo[]" value="<?php echo $c; ?>" <?php echo in_array((string)$c, $filtro_ciclo) ? 'checked' : ''; ?> /> 
@@ -474,14 +562,14 @@ foreach ($resultados['actual'] as $agencia_data) {
                 <div class="ea-form__group">
                     <label class="ea-form__label">
                         <span class="material-symbols-rounded">update</span>
-                        Ciclos Mens. (62-80)
+                        Ciclos Mens. (62-84)
                     </label>
                     <div class="ea-dropdown-checkboxes" style="position: relative;">
                         <div class="ea-form__control ea-dropdown-toggle" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-width: 140px; background: #fff;">
-                            <span class="ea-dropdown-text">TODOS</span>
+                            <span class="ea-dropdown-text"><?php echo htmlspecialchars(obtenerTextoRangoFiltro($ciclos_mensuales, $filtro_ciclo)); ?></span>
                             <span class="material-symbols-rounded" style="font-size: 1.2rem; pointer-events: none;">arrow_drop_down</span>
                         </div>
-                        <div class="ea-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 400px; overflow-y: auto; background: #fff; border: 1px solid #ced4da; border-radius: 4px; padding: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10; margin-top: 5px;">
+                        <div class="ea-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 400px; overflow-y: auto; overflow-x: hidden; background: #fff; border: 1px solid #ced4da; border-radius: 4px; padding: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10; margin-top: 5px;">
                             <div style="display: flex; gap: 5px; padding: 5px; margin-bottom: 5px;">
                                 <button type="button" class="mode-rango active" style="flex:1; border: 1px solid var(--ea-primary); background: var(--ea-primary); color: #fff; border-radius: 4px; padding: 4px; cursor: pointer; font-size: 0.8rem;">Rango</button>
                                 <button type="button" class="mode-indiv" style="flex:1; border: 1px solid #ced4da; background: #f8f9fa; color: #333; border-radius: 4px; padding: 4px; cursor: pointer; font-size: 0.8rem;">Individual</button>
@@ -491,8 +579,8 @@ foreach ($resultados['actual'] as $agencia_data) {
                             </label>
                             <hr style="margin: 4px 0; border-color: #eee;">
                             <?php foreach($ciclos_mensuales as $c): 
-                                $is_missing = !in_array($c, $ciclos_actuales);
-                                $lbl_style = $is_missing ? 'color: #d32f2f; font-weight: bold;' : '';
+                                $no_pasa_regla = !in_array($c, $ciclos_actuales_filtrados);
+                                $lbl_style = $no_pasa_regla ? 'color: #d32f2f; font-weight: bold;' : '';
                             ?>
                                 <label style="display: block; font-size: 0.85rem; cursor: pointer; padding: 5px; <?php echo $lbl_style; ?>" class="lbl-ciclo">
                                     <input type="checkbox" class="chk-ciclo" name="ciclo[]" value="<?php echo $c; ?>" <?php echo in_array((string)$c, $filtro_ciclo) ? 'checked' : ''; ?> /> 
@@ -503,13 +591,63 @@ foreach ($resultados['actual'] as $agencia_data) {
                     </div>
                 </div>
 
-                <div style="display: flex; align-items: flex-end; gap: 10px;">
+                <div style="display: flex; align-items: flex-end; gap: 10px; width: 100%;">
                     <button type="submit" class="ea-btn ea-btn--primary">
                         <span class="material-symbols-rounded">search</span> Aplicar
                     </button>
                     <?php if($filtro_zona !== '' || !empty($filtro_ciclo)): ?>
                         <a href="?m=<?php echo $p1_mes; ?>&a=<?php echo $p1_anio; ?>&clear_filters=1" class="ea-btn ea-btn--danger">Limpiar</a>
                     <?php endif; ?>
+
+                    <div style="display: flex; align-items: flex-end; margin-left: auto; gap: 8px;">
+                        <div class="btn-extras-wrapper" id="extras-wrapper">
+                            <button type="button" class="btn-extras-toggle" id="btn-extras-toggle">
+                                <span class="material-symbols-rounded" style="font-size: 17px;">auto_awesome</span>
+                                Extras
+                            </button>
+                            <div class="extras-dropdown-menu" id="extras-dropdown">
+                                <label id="extras-bloquear-label">
+                                    <input type="checkbox" id="chk-extras-bloquear" />
+                                    <span class="material-symbols-rounded" style="font-size: 17px; color: #555;">functions</span>
+                                    <span>Bloquear</span>
+                                    <span class="extras-badge" style="background:#e2e8f0; border:1px solid #cbd5e1;"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="btn-anom-wrapper" id="anom-wrapper">
+                            <button type="button" class="btn-anom-toggle active" id="btn-anom-toggle">
+                                <span class="material-symbols-rounded" style="font-size: 17px;">electric_bolt</span>
+                                Defectos
+                                <span id="anom-desel-badge" style="display:none; background: rgba(255,255,255,0.35); padding: 1px 6px; border-radius: 10px; font-size: 0.75rem; margin-left: 2px;"></span>
+                            </button>
+                            <div class="anom-dropdown-menu" id="anom-dropdown">
+                                <label class="anom-select-all">
+                                    <input type="checkbox" id="anom-select-all" checked /> <strong>(Seleccionar todo)</strong>
+                                </label>
+                                <hr style="margin: 4px 0; border-color: #eee;">
+                                <?php
+                                $anomalias_labels_ui = [
+                                    'cancelaciones'           => 'Cancelaciones',
+                                    'estimaciones'            => 'Estimaciones',
+                                    'consumos_cero'           => 'Consumo Cero',
+                                    'servicios_sin_medicion'  => 'Sin Medición',
+                                    'correcciones_de_lecturas'=> 'Corrección de Lec.',
+                                    'anomalias_pendientes'    => 'Anomalías Pendientes',
+                                    'sin_facturar'            => 'Sin Facturar',
+                                    'cargas_directas'         => 'Cargas Directas',
+                                ];
+                                foreach ($anomalias as $anom_key):
+                                    $anom_label = $anomalias_labels_ui[$anom_key] ?? ucwords(str_replace('_',' ',$anom_key));
+                                ?>
+                                    <label>
+                                        <input type="checkbox" class="chk-anom" data-anom="<?php echo $anom_key; ?>" checked />
+                                        <?php echo htmlspecialchars($anom_label); ?>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
@@ -537,18 +675,18 @@ foreach ($resultados['actual'] as $agencia_data) {
             </span>
             </div>
             <div class="ea-table-wrapper">
-                <table class="ea-table">
+                <table class="ea-table" id="tabla-agencia-<?php echo $periodo; ?>">
                     <thead>
                     <tr class="ea-table__head-cols">
                         <th class="ea-th-agencia">AGENCIA</th>
-                        <th>CANCELACIONES</th>
-                        <th>ESTIMACIONES</th>
-                        <th>CONSUMO CERO</th>
-                        <th>SIN MED</th>
-                        <th>CORREC. LEC</th>
-                        <th>ANOM. PEND</th>
-                        <th>SIN FACT</th>
-                        <th>CARGAS DIR</th>
+                        <th data-anom-sub="cancelaciones">CANCELACIONES</th>
+                        <th data-anom-sub="estimaciones">ESTIMACIONES</th>
+                        <th data-anom-sub="consumos_cero">CONSUMO CERO</th>
+                        <th data-anom-sub="servicios_sin_medicion">SIN MED</th>
+                        <th data-anom-sub="correcciones_de_lecturas">CORREC. LEC</th>
+                        <th data-anom-sub="anomalias_pendientes">ANOM. PEND</th>
+                        <th data-anom-sub="sin_facturar">SIN FACT</th>
+                        <th data-anom-sub="cargas_directas">CARGAS DIR</th>
                         <th class="ea-th-defecto">
                             <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
                                 DEFECTO
@@ -567,14 +705,17 @@ foreach ($resultados['actual'] as $agencia_data) {
                         foreach ($anomalias as $anomalia) {
                             $suma_fila += $resultados[$periodo][$agencia][$anomalia];
                         }
+                        if ($agencia === 'MOTUL' && $suma_fila == 0) {
+                            continue;
+                        }
                         ?>
-                        <tr data-orig-index="<?php echo $idx_row++; ?>" data-total="<?php echo $suma_fila; ?>">
+                        <tr data-orig-index="<?php echo $idx_row++; ?>" data-total="<?php echo $suma_fila; ?> ">
                             <td class="ea-td-agencia"><?php echo $agencia; ?></td>
                             <?php foreach ($anomalias as $anomalia):
                                 $valor = $resultados[$periodo][$agencia][$anomalia];
                                 $totales_columnas[$anomalia] += $valor;
                                 ?>
-                                <td class="ea-td-num <?php echo $valor > 0 ? 'ea-td-num--val' : ''; ?>" data-val="<?php echo $valor; ?>">
+                                <td class="ea-td-num <?php echo $valor > 0 ? 'ea-td-num--val' : ''; ?>" data-val="<?php echo $valor; ?>" data-anom-cell="<?php echo $anomalia; ?>">
                                     <?php if ($valor > 0): ?>
                                         <a href="javascript:void(0)" class="ea-detail-trigger" 
                                            data-tabla="<?php echo $anomalia . $sufijos[$periodo]; ?>" 
@@ -597,9 +738,9 @@ foreach ($resultados['actual'] as $agencia_data) {
                     <tr class="ea-tr-total">
                         <td class="ea-td-agencia">TOTAL</td>
                         <?php foreach ($anomalias as $anomalia): ?>
-                            <td class="ea-td-num"><?php echo number_format($totales_columnas[$anomalia]); ?></td>
+                            <td class="ea-td-num" data-anom-total-cell="<?php echo $anomalia; ?>" data-val="<?php echo $totales_columnas[$anomalia]; ?>"><?php echo number_format($totales_columnas[$anomalia]); ?></td>
                         <?php endforeach; ?>
-                        <td class="ea-td-defecto"><?php echo number_format($gran_total_defecto); ?></td>
+                        <td class="ea-td-defecto" id="gran-total-defecto-<?php echo $periodo; ?>" data-val="<?php echo $gran_total_defecto; ?>"><?php echo number_format($gran_total_defecto); ?></td>
                     </tr>
                     </tbody>
                 </table>
@@ -636,10 +777,87 @@ foreach ($resultados['actual'] as $agencia_data) {
 </div>
 
 <style>
+    /* Extras: Reincidencias y Evolución */
+    .btn-extras-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+    .btn-extras-toggle {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 6px 14px; border-radius: 6px; border: 1px solid #f5c790;
+        background: #fde8c8; color: #7d4000; font-size: 0.85rem; font-weight: 600;
+        cursor: pointer; transition: all 0.2s;
+    }
+    .btn-extras-toggle:hover { background: #fbd5a0; border-color: #f0a94a; }
+    .btn-extras-toggle.active { background: #f0883e; color: #fff; border-color: #f0883e; }
+    .extras-dropdown-menu {
+        display: none;
+        position: absolute;
+        top: 100%; right: 0;
+        min-width: 200px;
+        background: #fff;
+        border: 1px solid #ced4da;
+        border-radius: 8px;
+        padding: 10px 8px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        z-index: 50; margin-top: 5px;
+    }
+    .extras-dropdown-menu.open { display: block; }
+    .extras-dropdown-menu label {
+        display: flex; align-items: center; gap: 7px;
+        font-size: 0.88rem; cursor: pointer;
+        padding: 6px 8px; border-radius: 4px; transition: background 0.15s;
+    }
+    .extras-dropdown-menu label:hover { background: #f1f3f5; }
+    .extras-dropdown-menu .extras-badge {
+        display: inline-block; width: 10px; height: 10px;
+        border-radius: 50%; margin-left: auto;
+    }
+
+    /* Botón y dropdown de Anomalías */
+    .btn-anom-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+    .btn-anom-toggle {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 6px 14px; border-radius: 6px; border: 1px solid #a3d9a5;
+        background: #d4edda; color: #2d6a4f; font-size: 0.85rem; font-weight: 600;
+        cursor: pointer; transition: all 0.2s;
+    }
+    .btn-anom-toggle:hover { background: #c1e6c9; border-color: #82c785; }
+    .btn-anom-toggle.active { background: #56ab5e; color: #fff; border-color: #56ab5e; }
+    .anom-dropdown-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        right: 0;
+        min-width: 260px;
+        max-height: 420px;
+        overflow-y: auto;
+        background: #fff;
+        border: 1px solid #ced4da;
+        border-radius: 8px;
+        padding: 8px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        z-index: 50;
+        margin-top: 5px;
+    }
+    .anom-dropdown-menu.open { display: block; }
+    .anom-dropdown-menu label {
+        display: flex; align-items: center; gap: 7px;
+        font-size: 0.85rem; cursor: pointer;
+        padding: 5px 8px; border-radius: 4px; transition: background 0.15s;
+    }
+    .anom-dropdown-menu label:hover { background: #f1f3f5; }
+    .anom-dropdown-menu .anom-select-all {
+        background: #f8f9fa; margin-bottom: 4px; font-weight: 600;
+    }
+
     /* ============================================================
        REGLAS DE DISEÑO NIVEL AGENCIA (EXCEL ESTILO)
        ============================================================ */
-    .ea-table { border-collapse: collapse; border-style: hidden; table-layout: auto !important; width: auto !important; }
+    .ea-table { border-collapse: collapse; border-style: hidden; table-layout: auto !important; width: 100% !important; }
     .ea-table th, .ea-table td { 
         border: 1px solid #000 !important; 
         color: #000 !important; 
@@ -648,13 +866,13 @@ foreach ($resultados['actual'] as $agencia_data) {
     .ea-table__head-cols th {
         font-size: 12px !important;
         text-align: center !important;
-        padding: 4px 10px !important;
+        padding: 2px 5px !important;
         font-weight: bold !important;
         white-space: nowrap !important;
         width: auto !important;
     }
     .ea-td-num, .ea-td-defecto {
-        font-size: 17px !important;
+        font-size: 20px !important;
         text-align: center !important; 
         font-weight: normal !important; 
         padding: 1px 4px !important;
@@ -851,30 +1069,15 @@ foreach ($resultados['actual'] as $agencia_data) {
             let rangeStartIdx = null;
 
             function updateText() {
-                const checked = chkCiclos.filter(c => c.checked);
-                if (checked.length === 0 || checked.length === chkCiclos.length) {
-                    text.textContent = 'TODOS';
+                const checked = chkCiclos.filter(c => c.checked && !c.disabled);
+                
+                if (checked.length === 0) {
+                    text.textContent = 'Ninguno';
                 } else if (checked.length === 1) {
                     text.textContent = checked[0].value;
                 } else {
-                    // Obtener valores numéricos y ordenar
                     const vals = checked.map(c => parseInt(c.value)).sort((a, b) => a - b);
-                    // Verificar si forman una secuencia con paso constante
-                    const step = vals[1] - vals[0];
-                    let esSecuencia = step > 0;
-                    for (let i = 2; i < vals.length; i++) {
-                        if (vals[i] - vals[i - 1] !== step) {
-                            esSecuencia = false;
-                            break;
-                        }
-                    }
-                    if (esSecuencia) {
-                        text.textContent = vals[0] + ' AL ' + vals[vals.length - 1];
-                    } else if (vals.length <= 4) {
-                        text.textContent = vals.join(', ');
-                    } else {
-                        text.textContent = checked.length + ' sel.';
-                    }
+                    text.textContent = vals[0] + ' AL ' + vals[vals.length - 1];
                 }
             }
 
@@ -908,21 +1111,28 @@ foreach ($resultados['actual'] as $agencia_data) {
                     btnIndiv.style.border = '1px solid #ced4da';
 
                     // Sincronización absoluta: autoseleccionar el rango si hay elementos previamente marcados
-                    const checkedIndices = chkCiclos.map((c, i) => c.checked ? i : -1).filter(idx => idx !== -1);
+                    const checkedIndices = chkCiclos.map((c, i) => (c.checked && !c.disabled) ? i : -1).filter(idx => idx !== -1);
                     if (checkedIndices.length > 0) {
                         const minIdx = Math.min(...checkedIndices);
                         const maxIdx = Math.max(...checkedIndices);
                         for (let i = minIdx; i <= maxIdx; i++) {
-                            chkCiclos[i].checked = true;
+                            if (!chkCiclos[i].disabled) {
+                                chkCiclos[i].checked = true;
+                            }
                         }
-                        chkSelectAll.checked = chkCiclos.every(c => c.checked);
+                        const enabled = chkCiclos.filter(c => !c.disabled);
+                        chkSelectAll.checked = enabled.length > 0 && enabled.every(c => c.checked);
                         updateText();
                     }
                 });
             }
 
             chkSelectAll.addEventListener('change', (e) => {
-                chkCiclos.forEach(chk => chk.checked = e.target.checked);
+                chkCiclos.forEach(chk => {
+                    if (!chk.disabled) {
+                        chk.checked = e.target.checked;
+                    }
+                });
                 updateText();
                 rangeStartIdx = null;
                 lblCiclos.forEach(lbl => lbl.style.backgroundColor = 'transparent');
@@ -935,7 +1145,9 @@ foreach ($resultados['actual'] as $agencia_data) {
                             // Primer click del rango: se toma como límite superior y se selecciona desde el inicio
                             const valToSet = chkCiclos[idx].checked;
                             for (let i = 0; i <= idx; i++) {
-                                chkCiclos[i].checked = valToSet;
+                                if (!chkCiclos[i].disabled) {
+                                    chkCiclos[i].checked = valToSet;
+                                }
                             }
                             rangeStartIdx = idx;
                             lblCiclos.forEach(lbl => lbl.style.backgroundColor = 'transparent');
@@ -946,13 +1158,16 @@ foreach ($resultados['actual'] as $agencia_data) {
                             const end = Math.max(rangeStartIdx, idx);
                             const valToSet = chkCiclos[rangeStartIdx].checked;
                             for (let i = start; i <= end; i++) {
-                                chkCiclos[i].checked = valToSet;
+                                if (!chkCiclos[i].disabled) {
+                                    chkCiclos[i].checked = valToSet;
+                                }
                             }
                             rangeStartIdx = null;
                             lblCiclos.forEach(lbl => lbl.style.backgroundColor = 'transparent');
                         }
                     }
-                    chkSelectAll.checked = chkCiclos.length > 0 && chkCiclos.every(c => c.checked);
+                    const enabled = chkCiclos.filter(c => !c.disabled);
+                    chkSelectAll.checked = enabled.length > 0 && enabled.every(c => c.checked);
                     updateText();
                 });
             });
@@ -968,7 +1183,8 @@ foreach ($resultados['actual'] as $agencia_data) {
 
             // Inicializar texto y checkbox 'Select All'
             if(chkCiclos.length > 0) {
-                chkSelectAll.checked = chkCiclos.every(c => c.checked);
+                const enabled = chkCiclos.filter(c => !c.disabled);
+                chkSelectAll.checked = enabled.length > 0 && enabled.every(c => c.checked);
                 updateText();
             }
         });
@@ -986,6 +1202,192 @@ foreach ($resultados['actual'] as $agencia_data) {
         const total = <?php echo $total_registros_analisis; ?>;
         const placeholder = document.getElementById('total-registros-placeholder');
         if(placeholder) placeholder.textContent = total.toLocaleString();
+
+        // ── Filtrado dinámico de ciclos por zona ──────────────────────────────
+        (function () {
+            const ciclosPorZona = <?php echo json_encode($ciclos_por_zona, JSON_NUMERIC_CHECK); ?>;
+
+            const selectZona = document.getElementById('zona');
+            if (!selectZona) return;
+
+            function aplicarFiltroZonaCiclos() {
+                const zonaVal = selectZona.value;
+                const ciclosDisponibles = (zonaVal !== '' && ciclosPorZona[zonaVal])
+                    ? ciclosPorZona[zonaVal]
+                    : null;
+
+                document.querySelectorAll('.chk-ciclo').forEach(function (chk) {
+                    const ciclo = parseInt(chk.value);
+                    const lbl = chk.closest('label');
+                    const sinDatos = ciclosDisponibles !== null && !ciclosDisponibles.includes(ciclo);
+
+                    if (sinDatos) {
+                        chk.disabled = true;
+                        chk.checked = false;
+                        if (lbl) lbl.style.display = 'none';
+                    } else {
+                        chk.disabled = false;
+                        if (lbl) lbl.style.display = '';
+                    }
+                });
+
+                document.querySelectorAll('.ea-dropdown-checkboxes').forEach(function (dropdown) {
+                    const chkAll = dropdown.querySelector('.chkSelectAllCiclo');
+                    const chks = Array.from(dropdown.querySelectorAll('.chk-ciclo'));
+                    const textEl = dropdown.querySelector('.ea-dropdown-text');
+                    if (!chkAll || chks.length === 0) return;
+
+                    const enabled = chks.filter(c => !c.disabled);
+                    chkAll.checked = enabled.length > 0 && enabled.every(c => c.checked);
+
+                    const checked = chks.filter(c => c.checked && !c.disabled);
+                    if (textEl) {
+                        if (checked.length === 0) {
+                            textEl.textContent = 'Ninguno';
+                        } else if (checked.length === 1) {
+                            textEl.textContent = checked[0].value;
+                        } else {
+                            const vals = checked.map(c => parseInt(c.value)).sort((a, b) => a - b);
+                            textEl.textContent = vals[0] + ' AL ' + vals[vals.length - 1];
+                        }
+                    }
+                });
+            }
+
+            selectZona.addEventListener('change', aplicarFiltroZonaCiclos);
+            aplicarFiltroZonaCiclos();
+        })();
+        // ─────────────────────────────────────────────────────────────────────
+
+        // ─── LÓGICA DE EXTRAS Y ANOMALÍAS EN REPORTE AGENCIA ─────────────
+        (function() {
+            const extWrapper   = document.getElementById('extras-wrapper');
+            const extBtnToggle = document.getElementById('btn-extras-toggle');
+            const extDropdown  = document.getElementById('extras-dropdown');
+            const chkBloquear  = document.getElementById('chk-extras-bloquear');
+
+            const anomWrapper  = document.getElementById('anom-wrapper');
+            const anomBtnToggle = document.getElementById('btn-anom-toggle');
+            const anomDropdown = document.getElementById('anom-dropdown');
+            const selectAll    = document.getElementById('anom-select-all');
+            const chkAnoms     = Array.from(document.querySelectorAll('.chk-anom'));
+            const badge        = document.getElementById('anom-desel-badge');
+
+            if (extBtnToggle && extDropdown) {
+                extBtnToggle.addEventListener('click', function(e) {
+                    e.stopPropagation(); e.preventDefault();
+                    extDropdown.classList.toggle('open');
+                });
+                extDropdown.addEventListener('click', e => e.stopPropagation());
+                document.addEventListener('click', e => {
+                    if (!extWrapper.contains(e.target)) extDropdown.classList.remove('open');
+                });
+                chkBloquear.addEventListener('change', function() {
+                    extBtnToggle.classList.toggle('active', this.checked);
+                    updateColumnVisibility();
+                });
+            }
+
+            if (anomBtnToggle && anomDropdown) {
+                anomBtnToggle.addEventListener('click', function(e) {
+                    e.stopPropagation(); e.preventDefault();
+                    anomDropdown.classList.toggle('open');
+                });
+                anomDropdown.addEventListener('click', e => e.stopPropagation());
+                document.addEventListener('click', e => {
+                    if (!anomWrapper.contains(e.target)) anomDropdown.classList.remove('open');
+                });
+
+                selectAll.addEventListener('change', function() {
+                    chkAnoms.forEach(chk => chk.checked = this.checked);
+                    updateColumnVisibility();
+                });
+
+                chkAnoms.forEach(chk => {
+                    chk.addEventListener('change', updateColumnVisibility);
+                });
+            }
+
+            const anomOrder = ['cancelaciones','estimaciones','consumos_cero','servicios_sin_medicion',
+                               'correcciones_de_lecturas','anomalias_pendientes','sin_facturar','cargas_directas'];
+
+            function updateColumnVisibility() {
+                const activeAnoms = new Set(
+                    chkAnoms.filter(c => c.checked).map(c => c.dataset.anom)
+                );
+
+                // Ocultar/mostrar las columnas en cada una de las tablas del periodo
+                const tables = document.querySelectorAll('.ea-table');
+                tables.forEach(table => {
+                    // Actualizar cabecera
+                    table.querySelectorAll('[data-anom-sub]').forEach(th => {
+                        const show = activeAnoms.has(th.dataset.anomSub);
+                        th.style.display = show ? '' : 'none';
+                    });
+
+                    // Actualizar celdas del cuerpo
+                    table.querySelectorAll('[data-anom-cell]').forEach(td => {
+                        const show = activeAnoms.has(td.dataset.anomCell);
+                        td.style.display = show ? '' : 'none';
+                    });
+
+                    // Actualizar fila de totales
+                    table.querySelectorAll('[data-anom-total-cell]').forEach(td => {
+                        const show = activeAnoms.has(td.dataset.anomTotalCell);
+                        td.style.display = show ? '' : 'none';
+                    });
+
+                    // Recalcular sumatoria de defectos
+                    recalcularDefectos(table, activeAnoms);
+                });
+
+                // Actualizar badge
+                const deselCount = chkAnoms.length - activeAnoms.size;
+                if (badge) {
+                    if (deselCount > 0) {
+                        badge.style.display = 'inline';
+                        badge.textContent = deselCount + ' ocult.';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+
+                if (selectAll) {
+                    selectAll.checked = chkAnoms.every(c => c.checked);
+                }
+            }
+
+            function recalcularDefectos(table, activeAnoms) {
+                let granTotal = 0;
+                table.querySelectorAll('tbody tr:not(.ea-tr-total)').forEach(row => {
+                    let sum = 0;
+                    anomOrder.forEach(anom => {
+                        if ((!chkBloquear || !chkBloquear.checked) && !activeAnoms.has(anom)) return;
+                        const cell = row.querySelector(`[data-anom-cell="${anom}"]`);
+                        if (cell) {
+                            sum += parseInt(cell.dataset.val) || 0;
+                        }
+                    });
+                    const defCell = row.querySelector('.ea-td-defecto');
+                    if (defCell) {
+                        defCell.textContent = sum.toLocaleString();
+                        defCell.setAttribute('data-val', sum);
+                    }
+                    // También actualizar el atributo de datos de la fila
+                    row.setAttribute('data-total', sum);
+                    granTotal += sum;
+                });
+
+                const grandTotalCell = table.querySelector('.ea-tr-total .ea-td-defecto');
+                if (grandTotalCell) {
+                    grandTotalCell.textContent = granTotal.toLocaleString();
+                    grandTotalCell.setAttribute('data-val', granTotal);
+                }
+            }
+
+            // Inicializar al cargar
+            updateColumnVisibility();
+        })();
 
         // Lógica del Modal
         const modal = document.getElementById('ea-modal');

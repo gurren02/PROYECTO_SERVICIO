@@ -1,9 +1,9 @@
 <?php
-// Obtener nombre del usuario de la sesi√≥n adaptado a tu nueva BD
-// Usamos 'nombre_completo', y si no est√°, caemos al texto por defecto
+// Obtener nombre del usuario de la sesiÛn adaptado a tu nueva BD
+// Usamos 'nombre_completo', y si no est·, caemos al texto por defecto
 $nombre_usuario = isset($_SESSION['nombre_completo']) ? htmlspecialchars($_SESSION['nombre_completo']) : 'Usuario no encontrado';
 
-// Como no tienes columna de rol en la BD, usamos el 'userlog' para mantener el dise√±o visual intacto
+// Como no tienes columna de rol en la BD, usamos el 'userlog' para mantener el diseÒo visual intacto
 $rol_usuario    = isset($_SESSION['userlog']) ? htmlspecialchars($_SESSION['userlog']) : '';
 ?>
 
@@ -11,11 +11,11 @@ $rol_usuario    = isset($_SESSION['userlog']) ? htmlspecialchars($_SESSION['user
 
 <div class="contenedor_header">
     <a href="index.php" class="header-logo-link" aria-label="Inicio">
-        <img src="../assets/multimedia/logo-cfe.svg" alt="logo CFE" class="logo-header">
+        <img src="../assets/multimedia/cfe.png" alt="logo CFE" class="logo-header">
     </a>
 
     <div class="header-user" id="headerUser">
-        <button class="header-user__btn" onclick="toggleUserMenu()" aria-label="Men√∫ de usuario" aria-expanded="false" id="userMenuBtn">
+        <button class="header-user__btn" onclick="toggleUserMenu()" aria-label="Men˙ de usuario" aria-expanded="false" id="userMenuBtn">
             <span class="material-symbols-rounded header-user__icon">account_circle</span>
         </button>
 
@@ -41,7 +41,7 @@ $rol_usuario    = isset($_SESSION['userlog']) ? htmlspecialchars($_SESSION['user
 
             <a href="../src/salir.php" class="header-user__item header-user__item--danger" role="menuitem">
                 <span class="material-symbols-rounded">logout</span>
-                Cerrar sesi√≥n
+                Cerrar sesiÛn
             </a>
         </div>
     </div>
@@ -49,7 +49,7 @@ $rol_usuario    = isset($_SESSION['userlog']) ? htmlspecialchars($_SESSION['user
 </div>
 
 <script>
-    // 1. L√ìGICA DEL DROPDOWN
+    // 1. L”GICA DEL DROPDOWN
     function toggleUserMenu() {
         const dropdown = document.getElementById('userDropdown');
         const btn      = document.getElementById('userMenuBtn');
@@ -68,7 +68,7 @@ $rol_usuario    = isset($_SESSION['userlog']) ? htmlspecialchars($_SESSION['user
         }
     });
 
-    // 2. L√ìGICA DE DATATABLES (Requiere jQuery cargado previamente)
+    // 2. L”GICA DE DATATABLES (Requiere jQuery cargado previamente)
     $(document).ready(function() {
         var table = $('#tablaDinamica').DataTable({
             "scrollX": false,
@@ -76,7 +76,7 @@ $rol_usuario    = isset($_SESSION['userlog']) ? htmlspecialchars($_SESSION['user
             "pageLength": 10,
             "deferRender": true,
             "colReorder": false,
-            "ordering": false,            // ‚Üê Desactiva el ordenamiento de columnas
+            "ordering": false,            // ? Desactiva el ordenamiento de columnas
             "language": {
                 "url": "https://cdn.datatables.net/plug-ins/2.0.0/i18n/es-ES.json"
             },

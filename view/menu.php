@@ -6,7 +6,8 @@
     <!-- Cabecera: logo CFE + botón toggle -->
     <div class="sidebar__head">
         <div class="sidebar__logo">
-            <img src="../assets/multimedia/logo-cfe.svg" alt="CFE" class="sidebar__logo-img">
+            <img src="../assets/multimedia/logoblanco_sedefac.webp" alt="Logo SEDEFAC" class="sidebar__logo-img sidebar__logo-icon">
+            <img src="../assets/multimedia/titulonegativo_sedefac.webp" alt="SEDEFAC" class="sidebar__logo-img sidebar__logo-text">
         </div>
         <button class="sidebar__toggle" id="sidebarToggle" onclick="toggleSidebar()" aria-label="Toggle menú">
             <span class="material-symbols-rounded" id="sidebarToggleIcon">chevron_left</span>
@@ -32,38 +33,31 @@
 
 
         <?php 
-        $active_reportes = in_array($pagina_actual, ['preparar_analisis.php', 'ejecutar_analisis_zona.php', 'ejecutar_analisis.php', 'detalle_estimaciones.php']);
-        $active_comparacion = ($pagina_actual === 'comparacion.php');
+        $active_reportes = in_array($pagina_actual, ['preparar_analisis.php', 'ejecutar_analisis_zona.php', 'ejecutar_analisis.php', 'detalle_estimaciones.php', 'comparacion.php']);
         $active_falsos = ($pagina_actual === 'falsos.php');
-        $active_calcular = $active_reportes || $active_comparacion || $active_falsos;
+        $active_calcular = $active_reportes || $active_falsos;
         ?>
         <div class="sidebar__item-wrapper <?php echo $active_calcular ? 'sidebar__item-wrapper--active' : ''; ?>">
-            <div class="sidebar__item" onclick="toggleCalcularSubmenu(event)" data-label="Calcular" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div class="sidebar__item" onclick="toggleCalcularSubmenu(event)" data-label="Seguimiento" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; width: 100%;">
                 <div style="display: flex; align-items: center; gap: 14px;">
                     <span class="material-symbols-rounded sidebar__icon">calculate</span>
-                    <span class="sidebar__label">Calcular</span>
+                    <span class="sidebar__label">Seguimiento</span>
                 </div>
                 <span class="material-symbols-rounded sidebar__arrow" id="calcularArrow">keyboard_arrow_right</span>
             </div>
             
             <div class="sidebar__submenu" id="calcularSubmenu">
-                <a href="falsos.php" 
-                   class="sidebar__subitem <?php echo $active_falsos ? 'sidebar__subitem--active' : ''; ?>"
-                   data-label="Falsos">
-                    <span class="material-symbols-rounded" style="font-size: 18px;">gpp_bad</span>
-                    <span class="sidebar__label">FALSOS</span>
-                </a>
-                <a href="comparacion.php" 
-                   class="sidebar__subitem <?php echo $active_comparacion ? 'sidebar__subitem--active' : ''; ?>"
-                   data-label="Comparación">
-                    <span class="material-symbols-rounded" style="font-size: 18px;">compare_arrows</span>
-                    <span class="sidebar__label">COMPARACION</span>
-                </a>
                 <a href="preparar_analisis.php" 
                    class="sidebar__subitem <?php echo $active_reportes ? 'sidebar__subitem--active' : ''; ?>"
-                   data-label="Reportes">
+                   data-label="Firme">
                     <span class="material-symbols-rounded" style="font-size: 18px;">assessment</span>
-                    <span class="sidebar__label">REPORTES</span>
+                    <span class="sidebar__label">Firme</span>
+                </a>
+                <a href="falsos.php" 
+                   class="sidebar__subitem <?php echo $active_falsos ? 'sidebar__subitem--active' : ''; ?>"
+                   data-label="Falso">
+                    <span class="material-symbols-rounded" style="font-size: 18px;">gpp_bad</span>
+                    <span class="sidebar__label">Falso</span>
                 </a>
             </div>
         </div>

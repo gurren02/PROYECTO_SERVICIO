@@ -87,6 +87,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
     <title>TABLA - <?php echo htmlspecialchars($titulo_mostrar); ?></title>
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/ejecutar_analisis.css">

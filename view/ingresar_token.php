@@ -55,6 +55,7 @@ mysqli_close($conectar);
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/login.css">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
     <title>CAMBIAR CONTRASEÑA</title>
 </head>
 <body>
@@ -65,7 +66,7 @@ mysqli_close($conectar);
             <h3 class="login-titulo">Nueva Contraseña</h3>
 
             <div class="login-imagen">
-                <img src="../assets/multimedia/cfe.png" alt="loginlogo" class="imagen_log"
+                <img src="../assets/multimedia/favicon-cfe.svg" alt="loginlogo" class="imagen_log"
                      onerror="this.outerHTML='<div class=\'logo-placeholder\'>⚡</div>'">
             </div>
 

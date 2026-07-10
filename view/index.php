@@ -10,10 +10,12 @@ include "../src/seguridad.php";
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SEDEFAC — Seguimiento a los Defectos de la Facturación. Sistema de análisis y control de anomalías CFE.">
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/index.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <title>SEGUIMIENTO ANOMALÍAS</title>
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
+    <title>SEDEFAC — Seguimiento a los Defectos de la Facturación</title>
 </head>
 <body>
 <header>
@@ -23,59 +25,71 @@ include "../src/seguridad.php";
 <main class="idx-main">
 
     <div class="idx-welcome">
-        <div>
-            <h1 class="idx-welcome__title">Bienvenido al sistema</h1>
-            <p class="idx-welcome__sub">Seguimiento y gestión de anomalías — CFE</p>
+        <div class="idx-welcome__brand">
+            <img src="../assets/multimedia/logo_sedefac.webp" alt="Logo SEDEFAC" class="idx-welcome__brand-logo">
+            <img src="../assets/multimedia/titulocompleto_sedefac.webp" alt="SEDEFAC — Seguimiento a los Defectos de la Facturación" class="idx-welcome__brand-title">
         </div>
         <span class="idx-welcome__date" id="idx-date"></span>
     </div>
 
     <div class="idx-grid">
 
+        <!-- CARGAR -->
         <a href="subir.php" class="idx-card idx-card--upload">
-            <div class="idx-card__glow"></div>
-            <div class="idx-card__icon-wrap">
-                <span class="material-symbols-rounded idx-card__icon">upload_file</span>
-            </div>
-            <div class="idx-card__body">
-                <h2 class="idx-card__title">Subir Archivos</h2>
-                <p class="idx-card__desc">Carga archivos CSV con datos de anomalías por tipo, año y mes.</p>
-            </div>
-            <span class="material-symbols-rounded idx-card__arrow">arrow_forward</span>
-        </a>
-
-        <a href="tablas.php" class="idx-card idx-card--tables">
-            <div class="idx-card__glow"></div>
-            <div class="idx-card__icon-wrap">
-                <span class="material-symbols-rounded idx-card__icon">table_chart</span>
-            </div>
-            <div class="idx-card__body">
-                <h2 class="idx-card__title">Gestionar Tablas</h2>
-                <p class="idx-card__desc">Visualiza, administra y elimina bases de datos de anomalías registradas.</p>
+            <div class="idx-card__bg"></div>
+            <div class="idx-card__overlay"></div>
+            <div class="idx-card__fade"></div>
+            <div class="idx-card__content">
+                <div class="idx-card__icon-wrap">
+                    <span class="material-symbols-rounded idx-card__icon">upload_file</span>
+                </div>
+                <h2 class="idx-card__title">Cargar</h2>
+                <p class="idx-card__desc">Carga y gestiona datos de defectos por tipo, año y mes desde archivos .CSV y .TXT.</p>
             </div>
             <span class="material-symbols-rounded idx-card__arrow">arrow_forward</span>
         </a>
 
-        <a href="preparar_analisis.php" class="idx-card idx-card--calc">
-            <div class="idx-card__glow"></div>
-            <div class="idx-card__icon-wrap">
-                <span class="material-symbols-rounded idx-card__icon">calculate</span>
-            </div>
-            <div class="idx-card__body">
-                <h2 class="idx-card__title">Calcular</h2>
-                <p class="idx-card__desc">Ejecuta cálculos y análisis estadísticos sobre los datos de anomalías.</p>
+        <!-- FIRME -->
+        <a href="preparar_analisis.php" class="idx-card idx-card--firme">
+            <div class="idx-card__bg"></div>
+            <div class="idx-card__overlay"></div>
+            <div class="idx-card__fade"></div>
+            <div class="idx-card__content">
+                <div class="idx-card__icon-wrap">
+                    <span class="material-symbols-rounded idx-card__icon">assessment</span>
+                </div>
+                <h2 class="idx-card__title">Firme</h2>
+                <p class="idx-card__desc">Genera reportes de defectos por zona, agencia, estimaciones y comparación de ciclos.</p>
             </div>
             <span class="material-symbols-rounded idx-card__arrow">arrow_forward</span>
         </a>
 
+        <!-- FALSO -->
+        <a href="falsos.php" class="idx-card idx-card--falso">
+            <div class="idx-card__bg"></div>
+            <div class="idx-card__overlay"></div>
+            <div class="idx-card__fade"></div>
+            <div class="idx-card__content">
+                <div class="idx-card__icon-wrap">
+                    <span class="material-symbols-rounded idx-card__icon">gpp_bad</span>
+                </div>
+                <h2 class="idx-card__title">Falso</h2>
+                <p class="idx-card__desc">Seguimiento de lecturas y estimados por agencia.</p>
+            </div>
+            <span class="material-symbols-rounded idx-card__arrow">arrow_forward</span>
+        </a>
+
+        <!-- USUARIOS (solo admin) -->
         <?php if (isset($_SESSION['rol']) && $_SESSION['rol'] === 'admin'): ?>
         <a href="usuarios.php" class="idx-card idx-card--users">
-            <div class="idx-card__glow"></div>
-            <div class="idx-card__icon-wrap">
-                <span class="material-symbols-rounded idx-card__icon">manage_accounts</span>
-            </div>
-            <div class="idx-card__body">
-                <h2 class="idx-card__title">Gestionar Usuarios</h2>
+            <div class="idx-card__bg"></div>
+            <div class="idx-card__overlay"></div>
+            <div class="idx-card__fade"></div>
+            <div class="idx-card__content">
+                <div class="idx-card__icon-wrap">
+                    <span class="material-symbols-rounded idx-card__icon">manage_accounts</span>
+                </div>
+                <h2 class="idx-card__title">Usuarios</h2>
                 <p class="idx-card__desc">Administra cuentas de acceso, registra nuevos usuarios y gestiona perfiles.</p>
             </div>
             <span class="material-symbols-rounded idx-card__arrow">arrow_forward</span>
@@ -98,4 +112,3 @@ include "../src/seguridad.php";
 
 </body>
 </html>
-

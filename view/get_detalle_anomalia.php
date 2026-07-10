@@ -28,7 +28,7 @@ if ($tabla === '') {
 
 $mapa_agencias = [
     'A'=>'CENTRO','B'=>'NORTE','C'=>'SUR','D'=>'ORIENTE','E'=>'PONIENTE',
-    'G'=>'PROGRESO','H'=>'HUNUCMA','J'=>'UMAN','K'=>'ACANCEH','M'=>'CONKAL'
+    'F'=>'MOTUL','G'=>'PROGRESO','H'=>'HUNUCMA','J'=>'UMAN','K'=>'ACANCEH','M'=>'CONKAL'
 ];
 
 try {
@@ -42,6 +42,7 @@ try {
     $columnas = $stmt_cols->fetchAll(PDO::FETCH_COLUMN);
 
     $where = "WHERE 1=1";
+    $where .= " AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))";
     $params = [];
 
     if ($agencia !== '') {
@@ -120,7 +121,16 @@ try {
         if ($modo === 'reincidente') {
             $rpu = isset($fila['Rpu']) ? trim($fila['Rpu']) : '';
             $reinc_count = isset($recurrences[$rpu]) ? $recurrences[$rpu] : 1;
-            echo '<td style="text-align:center;"><span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; background-color:#dc3545; color:white; border-radius:50%; font-weight:bold; font-size:11px;" title="Total histórico de reincidencias">'. $reinc_count . '</span></td>';
+            echo '<td style="text-align:center;">';
+            echo '<span class="reinc-history-badge" ';
+            echo 'style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; background-color:#dc3545; color:white; border-radius:50%; font-weight:bold; font-size:11px; cursor:pointer; transition: all 0.2s;" ';
+            echo 'title="Haz clic para ver historial de reincidencias de este RPU" ';
+            echo 'data-rpu="' . htmlspecialchars($rpu) . '" ';
+            echo 'data-prefix="' . htmlspecialchars($prefix) . '" ';
+            echo 'data-tabla="' . htmlspecialchars($tabla) . '">';
+            echo $reinc_count;
+            echo '</span>';
+            echo '</td>';
         }
         foreach ($columnas as $col) { echo '<td>' . htmlspecialchars($fila[$col] ?? '-') . '</td>'; }
         echo '</tr>';

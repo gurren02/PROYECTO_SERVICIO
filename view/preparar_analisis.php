@@ -96,6 +96,7 @@ if (isset($_REQUEST['mes_objetivo'], $_REQUEST['anio_objetivo'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
     <title>Preparar Análisis</title>
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/preparar_analisis.css">
@@ -176,6 +177,12 @@ if (isset($_REQUEST['mes_objetivo'], $_REQUEST['anio_objetivo'])) {
                class="calc-btn-generate ea-report-link" style="flex: 1; justify-content: center; background-color: #fcf3cf; color: #7d6608; border: 1px solid #f9e79f;">
                 <span class="material-symbols-rounded">table_chart</span>
                 Desglose de Estimaciones
+            </a>
+
+            <a href="comparacion.php?mes_objetivo=<?php echo $p1_mes; ?>&anio_objetivo=<?php echo $p1_anio; ?>"
+               class="calc-btn-generate ea-report-link" style="flex: 1; justify-content: center; background-color: #f4fadc; color: #515d07; border: 1px solid #e4f2b1;">
+                <span class="material-symbols-rounded">compare_arrows</span>
+                Comparación de Ciclos
             </a>
         </div>
 

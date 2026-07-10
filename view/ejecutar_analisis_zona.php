@@ -149,47 +149,41 @@ function formatearRangoCiclos($arr) {
     
     $partes = [];
     
-    // Bimestrales (secuencias con paso 2)
     if (!empty($bimestrales)) {
         if (count($bimestrales) === 1) {
             $partes[] = (string)$bimestrales[0];
         } else {
-            $es_secuencia = true;
-            for ($i = 1; $i < count($bimestrales); $i++) {
-                if ($bimestrales[$i] - $bimestrales[$i-1] !== 2) {
-                    $es_secuencia = false;
-                    break;
-                }
-            }
-            if ($es_secuencia) {
-                $partes[] = min($bimestrales) . " AL " . max($bimestrales);
-            } else {
-                $partes[] = implode(", ", $bimestrales);
-            }
+            $partes[] = min($bimestrales) . " AL " . max($bimestrales);
         }
     }
     
-    // Mensuales (secuencias con paso 1)
     if (!empty($mensuales)) {
         if (count($mensuales) === 1) {
             $partes[] = (string)$mensuales[0];
         } else {
-            $es_secuencia = true;
-            for ($i = 1; $i < count($mensuales); $i++) {
-                if ($mensuales[$i] - $mensuales[$i-1] !== 1) {
-                    $es_secuencia = false;
-                    break;
-                }
-            }
-            if ($es_secuencia) {
-                $partes[] = min($mensuales) . " AL " . max($mensuales);
-            } else {
-                $partes[] = implode(", ", $mensuales);
-            }
+            $partes[] = min($mensuales) . " AL " . max($mensuales);
         }
     }
     
     return implode(" Y ", $partes);
+}
+
+function obtenerTextoRangoFiltro($ciclos_completo, $filtro_ciclo, $icf_total = false) {
+    if ($icf_total) {
+        return "TODOS";
+    }
+    if (empty($filtro_ciclo)) {
+        $seleccionados = $ciclos_completo;
+    } else {
+        $seleccionados = array_intersect($ciclos_completo, array_map('intval', $filtro_ciclo));
+    }
+    if (empty($seleccionados)) {
+        return "Ninguno";
+    } elseif (count($seleccionados) === 1) {
+        return (string)reset($seleccionados);
+    } else {
+        return min($seleccionados) . " AL " . max($seleccionados);
+    }
 }
 
 // Función para formatear rango de ciclos
@@ -239,7 +233,7 @@ $titulo_reporte = "RESULTADO ZONA" . $ciclo_seccion . " " . obtenerNombreMes($p1
 
 $mapa_agencias = [
     'A'=>'CENTRO','B'=>'NORTE','C'=>'SUR','D'=>'ORIENTE','E'=>'PONIENTE',
-    'G'=>'PROGRESO','H'=>'HUNUCMA','J'=>'UMAN','K'=>'ACANCEH','M'=>'CONKAL'
+    'F'=>'MOTUL','G'=>'PROGRESO','H'=>'HUNUCMA','J'=>'UMAN','K'=>'ACANCEH','M'=>'CONKAL'
 ];
 
 $anomalias = ['cancelaciones','estimaciones','consumos_cero','servicios_sin_medicion',
@@ -301,6 +295,33 @@ if (isset($todas_las_tablas[$tabla_cd_actual])) {
 }
 sort($ciclos_cd_disponibles);
 
+// Mapa de ciclos disponibles por zona (para filtrado dinámico en el frontend).
+// Se consultan AMBOS períodos (actual + comparación) para que coincida exactamente
+// con los ciclos que se muestran en el dropdown ($ciclos_disponibles = actual ∪ comparación).
+// Si un ciclo aparece en cualquiera de los dos períodos para una zona, no se deshabilita.
+$ciclos_por_zona = [];
+foreach ($sufijos as $_sufijo_mapa) {
+    foreach ($anomalias as $_anom_mapa) {
+        $_tabla_mapa = $_anom_mapa . $_sufijo_mapa;
+        if (!isset($todas_las_tablas[$_tabla_mapa])) continue;
+        try {
+            $_stmt_mapa = $pdo->query("SELECT DISTINCT CAST(TRIM(`Zona`) AS UNSIGNED) as z, CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$_tabla_mapa` WHERE `Zona` IS NOT NULL AND `Zona` != '' AND `Ciclo` IS NOT NULL AND `Ciclo` != '' AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))");
+            while ($_r = $_stmt_mapa->fetch(PDO::FETCH_ASSOC)) {
+                $_z = (int)$_r['z'];
+                $_c = (int)$_r['c'];
+                if (!isset($ciclos_por_zona[$_z])) $ciclos_por_zona[$_z] = [];
+                $ciclos_por_zona[$_z][$_c] = true;
+            }
+        } catch (PDOException $e) {}
+    }
+}
+// Convertir los sets a arrays ordenados
+foreach ($ciclos_por_zona as $_z => &$_set) {
+    $_set = array_keys($_set);
+    sort($_set);
+}
+unset($_set);
+
 $is_even_month = ($p1_mes % 2 === 0);
 $ciclos_bimestrales = [];
 $ciclos_mensuales = [];
@@ -309,29 +330,122 @@ foreach ($ciclos_disponibles as $c) {
     if ($c >= 1 && $c <= 61) {
         if ($icf_total) {
             $ciclos_bimestrales[] = $c;
-        } elseif ($is_even_month && $c % 2 === 0) {
-            $ciclos_bimestrales[] = $c;
-        } elseif (!$is_even_month && $c % 2 !== 0) {
-            $ciclos_bimestrales[] = $c;
+        } else {
+            $coincide_paridad = ($is_even_month && $c % 2 === 0) || (!$is_even_month && $c % 2 !== 0);
+            if ($coincide_paridad) {
+                $ciclos_bimestrales[] = $c;
+            }
         }
-    } elseif ($c >= 62 && $c <= 80) {
+    } elseif ($c >= 62 && $c <= 84) {
         $ciclos_mensuales[] = $c;
     }
 }
 
+// Conteo de registros por ciclo en la tabla de estimaciones del periodo actual
+$conteos_por_ciclo = [];
+$tabla_estimaciones_actual = 'estimaciones' . $sufijos['actual'];
+if (isset($todas_las_tablas[$tabla_estimaciones_actual])) {
+    try {
+        $stmt_cnt = $pdo->query("SELECT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c, COUNT(*) as cnt FROM `$tabla_estimaciones_actual` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != '' GROUP BY c");
+        while ($r = $stmt_cnt->fetch(PDO::FETCH_ASSOC)) {
+            $c_val = (int)$r['c'];
+            $cnt_val = (int)$r['cnt'];
+            $conteos_por_ciclo[$c_val] = $cnt_val;
+        }
+    } catch (PDOException $e) {}
+}
+
+$ciclos_actuales_filtrados = [];
+if ($icf_total) {
+    // Si es ICF TOTAL, procesamos ambas paridades por separado buscando secuencias continuas
+    for ($c = 2; $c <= 61; $c += 2) {
+        $count = isset($conteos_por_ciclo[$c]) ? $conteos_por_ciclo[$c] : 0;
+        if ($count > 8) {
+            $ciclos_actuales_filtrados[] = $c;
+        } else {
+            break;
+        }
+    }
+    for ($c = 1; $c <= 61; $c += 2) {
+        $count = isset($conteos_por_ciclo[$c]) ? $conteos_por_ciclo[$c] : 0;
+        if ($count > 8) {
+            $ciclos_actuales_filtrados[] = $c;
+        } else {
+            break;
+        }
+    }
+} else {
+    // Caso normal: respetamos la paridad del mes actual
+    $start_cycle = $is_even_month ? 2 : 1;
+    for ($c = $start_cycle; $c <= 61; $c += 2) {
+        $count = isset($conteos_por_ciclo[$c]) ? $conteos_por_ciclo[$c] : 0;
+        if ($count > 8) {
+            $ciclos_actuales_filtrados[] = $c;
+        } else {
+            break;
+        }
+    }
+}
+// Ciclos mensuales (62-84): solo se incluyen si ellos mismos tienen > 8 registros en estimaciones
+for ($c = 62; $c <= 84; $c++) {
+    $count = isset($conteos_por_ciclo[$c]) ? $conteos_por_ciclo[$c] : 0;
+    if ($count > 8) {
+        $ciclos_actuales_filtrados[] = $c;
+    }
+}
+
+// Excepción Ciclo 80: Si el ciclo 79 es válido y existen datos para el ciclo 80 en cargas directas, el ciclo 80 es válido.
+if (in_array(79, $ciclos_actuales_filtrados)) {
+    $tabla_cd_actual = 'cargas_directas' . $sufijos['actual'];
+    if (isset($todas_las_tablas[$tabla_cd_actual])) {
+        try {
+            $stmt_cd_check = $pdo->prepare("SELECT COUNT(*) FROM `$tabla_cd_actual` WHERE CAST(TRIM(`Ciclo`) AS UNSIGNED) = 80");
+            $stmt_cd_check->execute();
+            if ((int)$stmt_cd_check->fetchColumn() > 0) {
+                if (!in_array(80, $ciclos_actuales_filtrados)) {
+                    $ciclos_actuales_filtrados[] = 80;
+                }
+            }
+        } catch (PDOException $e) {}
+    }
+}
+
+if (empty($ciclos_actuales_filtrados)) {
+    $ciclos_actuales_filtrados = $ciclos_actuales;
+}
+
 // Preselección de todos los ciclos que tengan valores en el mes actual (solo bimestrales por defecto)
 // Solo se ejecuta en primera carga (cuando no hay filtros aplicados, ni en sesión, ni por submit del formulario)
-$es_primera_carga = !isset($_GET['ciclo']) && !isset($_SESSION['filtro_ciclo']) && !isset($_GET['clear_filters']) && !isset($_GET['filtrado_aplicado']);
+$es_primera_carga = !isset($_GET['ciclo']) && !isset($_SESSION['filtro_ciclo']) && !isset($_GET['filtrado_aplicado']);
 if ($period_changed) {
     $es_primera_carga = true;
 }
 
 if ($es_primera_carga && empty($filtro_ciclo)) {
-    foreach ($ciclos_bimestrales as $c) {
-        if (in_array($c, $ciclos_actuales)) {
-            $filtro_ciclo[] = (string)$c;
+    foreach ($ciclos_disponibles as $c) {
+        if (in_array($c, $ciclos_actuales_filtrados)) {
+            if ($c >= 1 && $c <= 61) {
+                if ($icf_total) {
+                    $filtro_ciclo[] = (string)$c;
+                } else {
+                    $coincide_paridad = ($is_even_month && $c % 2 === 0) || (!$is_even_month && $c % 2 !== 0);
+                    if ($coincide_paridad) {
+                        $filtro_ciclo[] = (string)$c;
+                    }
+                }
+            } elseif ($c >= 62 && $c <= 84) {
+                $filtro_ciclo[] = (string)$c;
+            }
         }
     }
+}
+
+// Filtrar los ciclos para que correspondan ÚNICAMENTE a los disponibles para la zona seleccionada
+if ($filtro_zona !== '') {
+    $ciclos_validos_filtro = $ciclos_por_zona[(int)$filtro_zona] ?? [];
+    $filtro_ciclo = array_filter($filtro_ciclo, function($c) use ($ciclos_validos_filtro) {
+        return in_array((int)$c, $ciclos_validos_filtro);
+    });
 }
 
 
@@ -373,16 +487,14 @@ foreach ($sufijos as $periodo_key => $sufijo) {
                 $where_sql .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
                 $parametros_sql[] = (int)$filtro_zona;
             }
-            // Cargas directas SIEMPRE usa su propio filtro independiente
-            // y SIEMPRE filtra solo zona 1
+            $where_sql .= " AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`$columna_agencia`)) = 'F' OR UPPER(TRIM(`$columna_agencia`)) = 'MOTUL'))";
+            // Cargas directas usa su propio filtro de ciclo independiente, pero el mismo filtro de zona general
             if ($anomalia === 'cargas_directas') {
-                // Forzar zona 1 para cargas directas, independiente del filtro general
-                $where_sql = "WHERE 1=1 AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
-                $parametros_sql = [1];
                 if (!empty($filtro_ciclo_cd)) {
                     $where_sql .= buildCicloWhere($filtro_ciclo_cd, $parametros_sql);
+                } else {
+                    $where_sql .= buildCicloWhere($filtro_ciclo, $parametros_sql);
                 }
-                // Si está vacío (default o sin selección): no filtra ciclos → trae todo de zona 1
             } else {
                 $where_sql .= buildCicloWhere($filtro_ciclo, $parametros_sql);
             }
@@ -451,6 +563,7 @@ if (isset($resultados['actual'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
     <title>Reporte Nivel Zona</title>
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/header.css">
@@ -698,7 +811,7 @@ if (isset($resultados['actual'])) {
         .ea-tr-total .td-dif.dif-neg { background-color: #C6E0B4 !important; }
         .ea-tr-total .td-dif.dif-pos { background-color: #FFFF00 !important; }
 
-        .ea-zero { color: #000; font-size: 15px; font-weight: 600; }
+        .ea-zero { color: #000; font-size: 15px; font-weight: normal; }
 
         /* Columna % Evol */
         .ea-td-evol {
@@ -729,9 +842,9 @@ if (isset($resultados['actual'])) {
         .evol-col   { display: none; }
         .extras-reinc-visible .reinc-col { display: table-cell; }
         .extras-evol-visible  .evol-col  { display: table-cell; }
-        .reinc-col.th-sub, .reinc-col.th-group, .reinc-col.th-group-alt { background-color: #fce4ec !important; color: #000 !important; }
-        td.reinc-col { background-color: #fdf5f6; }
-        .ea-tr-total td.reinc-col { background-color: #f8d7da !important; color: #000 !important; }
+        .reinc-col.th-sub, .reinc-col.th-group, .reinc-col.th-group-alt { background-color: #ffbf80 !important; color: #000 !important; }
+        td.reinc-col { background-color: #ffe6cc !important; }
+        .ea-tr-total td.reinc-col { background-color: #ffa64d !important; color: #000 !important; }
 
         /* Extras: Reincidencias y Evolución */
         .btn-extras-wrapper {
@@ -887,7 +1000,7 @@ if (isset($resultados['actual'])) {
             </a>
             <div>
                 <h1 class="ea-page-title">Reporte Unificado: Nivel Zona</h1>
-                <p class="ea-page-subtitle">Comparativa: <?php echo obtenerNombreMes($p1_mes).' '.$p1_anio; ?> vs <?php echo $lbl_comp; ?></p>
+                <p class="ea-page-subtitle">Comparativa: <span style="color: #2E7D32; font-weight: bold;"><?php echo obtenerNombreMes($p1_mes).' '.$p1_anio; ?></span> vs <span style="color: #2E7D32; font-weight: bold;"><?php echo $lbl_comp; ?></span></p>
             </div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -904,12 +1017,15 @@ if (isset($resultados['actual'])) {
             <?php 
                 $params_est = "?m=$p1_mes&a=$p1_anio";
                 if ($filtro_zona !== '') $params_est .= "&zona=" . urlencode($filtro_zona);
-                if (!empty($filtro_ciclo)) $params_est .= "&ciclo=" . urlencode(implode(",", $filtro_ciclo));
                 $params_est .= "&origen=zona";
             ?>
             <a href="detalle_estimaciones.php<?php echo $params_est; ?>" class="ea-btn-switch-report" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; background-color: #fcf3cf; color: #7d6608; border: 1px solid #f9e79f; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: background 0.18s, transform 0.1s;" onmouseover="this.style.backgroundColor='#f9e79f'" onmouseout="this.style.backgroundColor='#fcf3cf'">
                 <span class="material-symbols-rounded" style="font-size: 18px;">table_chart</span>
                 Ir a Estimaciones
+            </a>
+            <a href="comparacion.php?mes_objetivo=<?php echo $p1_mes; ?>&anio_objetivo=<?php echo $p1_anio; ?><?php echo ($filtro_zona !== '') ? '&zona=' . urlencode($filtro_zona) : ''; ?>" class="ea-btn-switch-report" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; background-color: #f4fadc; color: #515d07; border: 1px solid #e4f2b1; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: background 0.18s, transform 0.1s;" onmouseover="this.style.backgroundColor='#e4f2b1'" onmouseout="this.style.backgroundColor='#f4fadc'">
+                <span class="material-symbols-rounded" style="font-size: 18px;">compare_arrows</span>
+                Ir a Comparación
             </a>
         </div>
     </div>
@@ -1012,10 +1128,10 @@ if (isset($resultados['actual'])) {
                     </label>
                     <div class="ea-dropdown-checkboxes" style="position: relative;">
                         <div class="ea-form__control ea-dropdown-toggle" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-width: 140px; background: #fff;">
-                            <span class="ea-dropdown-text">TODOS</span>
+                            <span class="ea-dropdown-text"><?php echo htmlspecialchars(obtenerTextoRangoFiltro($ciclos_bimestrales, $filtro_ciclo, $icf_total)); ?></span>
                             <span class="material-symbols-rounded" style="font-size: 1.2rem; pointer-events: none;">arrow_drop_down</span>
                         </div>
-                        <div class="ea-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 400px; overflow-y: auto; background: #fff; border: 1px solid #ced4da; border-radius: 4px; padding: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10; margin-top: 5px;">
+                        <div class="ea-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 400px; overflow-y: auto; overflow-x: hidden; background: #fff; border: 1px solid #ced4da; border-radius: 4px; padding: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10; margin-top: 5px;">
                             <div style="display: flex; gap: 5px; padding: 5px; margin-bottom: 5px;">
                                 <button type="button" class="mode-rango active" style="flex:1; border: 1px solid var(--ea-primary); background: var(--ea-primary); color: #fff; border-radius: 4px; padding: 4px; cursor: pointer; font-size: 0.8rem;">Rango</button>
                                 <button type="button" class="mode-indiv" style="flex:1; border: 1px solid #ced4da; background: #f8f9fa; color: #333; border-radius: 4px; padding: 4px; cursor: pointer; font-size: 0.8rem;">Individual</button>
@@ -1025,8 +1141,8 @@ if (isset($resultados['actual'])) {
                             </label>
                             <hr style="margin: 4px 0; border-color: #eee;">
                             <?php foreach($ciclos_bimestrales as $c): 
-                                $is_missing = !in_array($c, $ciclos_actuales);
-                                $lbl_style = $is_missing ? 'color: #d32f2f; font-weight: bold;' : '';
+                                $no_pasa_regla = !in_array($c, $ciclos_actuales_filtrados);
+                                $lbl_style = $no_pasa_regla ? 'color: #d32f2f; font-weight: bold;' : '';
                             ?>
                                 <label style="display: block; font-size: 0.85rem; cursor: pointer; padding: 5px; <?php echo $lbl_style; ?>" class="lbl-ciclo">
                                     <input type="checkbox" class="chk-ciclo" name="ciclo[]" value="<?php echo $c; ?>" <?php echo in_array((string)$c, $filtro_ciclo) ? 'checked' : ''; ?> /> 
@@ -1040,14 +1156,14 @@ if (isset($resultados['actual'])) {
                 <div class="ea-form__group">
                     <label class="ea-form__label">
                         <span class="material-symbols-rounded">update</span>
-                        Ciclos Mens. (62-80)
+                        Ciclos Mens. (62-84)
                     </label>
                     <div class="ea-dropdown-checkboxes" style="position: relative;">
                         <div class="ea-form__control ea-dropdown-toggle" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-width: 140px; background: #fff;">
-                            <span class="ea-dropdown-text">TODOS</span>
+                            <span class="ea-dropdown-text"><?php echo htmlspecialchars(obtenerTextoRangoFiltro($ciclos_mensuales, $filtro_ciclo, $icf_total)); ?></span>
                             <span class="material-symbols-rounded" style="font-size: 1.2rem; pointer-events: none;">arrow_drop_down</span>
                         </div>
-                        <div class="ea-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 400px; overflow-y: auto; background: #fff; border: 1px solid #ced4da; border-radius: 4px; padding: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10; margin-top: 5px;">
+                        <div class="ea-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 400px; overflow-y: auto; overflow-x: hidden; background: #fff; border: 1px solid #ced4da; border-radius: 4px; padding: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10; margin-top: 5px;">
                             <div style="display: flex; gap: 5px; padding: 5px; margin-bottom: 5px;">
                                 <button type="button" class="mode-rango active" style="flex:1; border: 1px solid var(--ea-primary); background: var(--ea-primary); color: #fff; border-radius: 4px; padding: 4px; cursor: pointer; font-size: 0.8rem;">Rango</button>
                                 <button type="button" class="mode-indiv" style="flex:1; border: 1px solid #ced4da; background: #f8f9fa; color: #333; border-radius: 4px; padding: 4px; cursor: pointer; font-size: 0.8rem;">Individual</button>
@@ -1057,8 +1173,8 @@ if (isset($resultados['actual'])) {
                             </label>
                             <hr style="margin: 4px 0; border-color: #eee;">
                             <?php foreach($ciclos_mensuales as $c): 
-                                $is_missing = !in_array($c, $ciclos_actuales);
-                                $lbl_style = $is_missing ? 'color: #d32f2f; font-weight: bold;' : '';
+                                $no_pasa_regla = !in_array($c, $ciclos_actuales_filtrados);
+                                $lbl_style = $no_pasa_regla ? 'color: #d32f2f; font-weight: bold;' : '';
                             ?>
                                 <label style="display: block; font-size: 0.85rem; cursor: pointer; padding: 5px; <?php echo $lbl_style; ?>" class="lbl-ciclo">
                                     <input type="checkbox" class="chk-ciclo" name="ciclo[]" value="<?php echo $c; ?>" <?php echo in_array((string)$c, $filtro_ciclo) ? 'checked' : ''; ?> /> 
@@ -1100,12 +1216,18 @@ if (isset($resultados['actual'])) {
                             <label id="extras-reinc-label">
                                 <input type="checkbox" id="chk-extras-reinc" />
                                 <span>Reincidencias</span>
-                                <span class="extras-badge" style="background:#f8d7da; border:1px solid #f1aeb5;"></span>
+                                <span class="extras-badge" style="background:#ffbf80; border:1px solid #ffa64d;"></span>
                             </label>
                             <label id="extras-evol-label">
                                 <input type="checkbox" id="chk-extras-evol" />
                                 <span>% Evolución</span>
                                 <span class="extras-badge" style="background:#FFF3CD; border:1px solid #f5c790;"></span>
+                            </label>
+                            <label id="extras-bloquear-label">
+                                <input type="checkbox" id="chk-extras-bloquear" />
+                                <span class="material-symbols-rounded" style="font-size: 17px; color: #555;">functions</span>
+                                <span>Bloquear</span>
+                                <span class="extras-badge" style="background:#e2e8f0; border:1px solid #cbd5e1;"></span>
                             </label>
                         </div>
 
@@ -1114,7 +1236,7 @@ if (isset($resultados['actual'])) {
                     <div class="btn-anom-wrapper" id="anom-wrapper">
                         <button type="button" class="btn-anom-toggle active" id="btn-anom-toggle">
                             <span class="material-symbols-rounded" style="font-size: 17px;">electric_bolt</span>
-                            Anomalías
+                            Defectos
                             <span id="anom-desel-badge" style="display:none; background: rgba(255,255,255,0.35); padding: 1px 6px; border-radius: 10px; font-size: 0.75rem; margin-left: 2px;"></span>
                         </button>
                         <div class="anom-dropdown-menu" id="anom-dropdown">
@@ -1150,37 +1272,38 @@ if (isset($resultados['actual'])) {
     </div>
 
     <?php
-    // Helper: devuelve inline style de bg/color para la celda % Evol según el valor
+    // Helper: devuelve inline style de bg/color para la celda % Evol según el valor (escala homologada de 10 niveles, amarilla-roja para positivos y verde para negativos)
     function evolStyle($evol, $max) {
-        if ($evol === null) return 'background:#fff; color:#1e2b27;';
+        if ($evol === null) return 'background: #FFFFF0 !important; color: #000000 !important;';
         $v = (float)$evol;
-        if (abs($v) < 0.01) return 'background:#fff; color:#1e2b27;';
-        if ($max <= 0) return 'background:#fff; color:#1e2b27;';
+        if (abs($v) < 0.01) return 'background: #FFFFF0 !important; color: #000000 !important;';
+        if ($max <= 0) return 'background: #FFFFF0 !important; color: #000000 !important;';
  
         $ratio = abs($v) / $max;
         if ($v > 0) {
-            // Positivos (Incremento de Anomalías) - Escala de amarillo a un rojo ligeramente más intenso (#E57373)
-            if ($ratio <= 0.10) return 'background: #FFFFDF; color: #1e2b27;';
-            if ($ratio <= 0.20) return 'background: #FFFFB8; color: #1e2b27;';
-            if ($ratio <= 0.30) return 'background: #FFFF94; color: #1e2b27;'; // Amarillo original
-            if ($ratio <= 0.40) return 'background: #FDF190; color: #1e2b27;';
-            if ($ratio <= 0.50) return 'background: #FCEB93; color: #1e2b27;'; // Nivel original
-            if ($ratio <= 0.60) return 'background: #F9D08D; color: #1e2b27;';
-            if ($ratio <= 0.70) return 'background: #EBCA8F; color: #1e2b27;'; // Nivel original
-            if ($ratio <= 0.80) return 'background: #F1AA87; color: #1e2b27;';
-            if ($ratio <= 0.90) return 'background: #F08B82; color: #1e2b27;';
-            return 'background: #E57373; color: #1e2b27; font-weight: bold;';
+            // Positivos (Incremento de anomalías - "Malo")
+            if ($ratio <= 0.10) return 'background: #FFFFDF !important; color: #000000 !important;';
+            if ($ratio <= 0.20) return 'background: #FFFFB8 !important; color: #000000 !important;';
+            if ($ratio <= 0.30) return 'background: #FFFF94 !important; color: #000000 !important;';
+            if ($ratio <= 0.40) return 'background: #FDF190 !important; color: #000000 !important;';
+            if ($ratio <= 0.50) return 'background: #FCEB93 !important; color: #000000 !important;';
+            if ($ratio <= 0.60) return 'background: #F9D08D !important; color: #000000 !important;';
+            if ($ratio <= 0.70) return 'background: #EBCA8F !important; color: #000000 !important;';
+            if ($ratio <= 0.80) return 'background: #F1AA87 !important; color: #000000 !important;';
+            if ($ratio <= 0.90) return 'background: #F08B82 !important; color: #000000 !important;';
+            return 'background: #F26A6A !important; color: #000000 !important;';
         } else {
-            // Negativos (Reducción de Anomalías) - Escala dentro de los límites originales (#E8F5E9 a #81C784)
-            if ($ratio <= 0.10) return 'background: #F4FBF5; color: #1e2b27;';
-            if ($ratio <= 0.20) return 'background: #E8F5E9; color: #1e2b27;'; // Verde original
-            if ($ratio <= 0.30) return 'background: #D8EED9; color: #1e2b27;';
-            if ($ratio <= 0.40) return 'background: #C8E6C9; color: #1e2b27;'; // Nivel original
-            if ($ratio <= 0.50) return 'background: #B8DEC0; color: #1e2b27;';
-            if ($ratio <= 0.60) return 'background: #A5D6A7; color: #1e2b27;'; // Nivel original
-            if ($ratio <= 0.70) return 'background: #96CE9D; color: #1e2b27;';
-            if ($ratio <= 0.80) return 'background: #89C791; color: #1e2b27;';
-            return 'background: #81C784; color: #1e2b27; font-weight: bold;';
+            // Negativos (Reducción de anomalías - "Bueno")
+            if ($ratio <= 0.10) return 'background: #CAEC07 !important; color: #000000 !important;';
+            if ($ratio <= 0.20) return 'background: #B2E005 !important; color: #000000 !important;';
+            if ($ratio <= 0.30) return 'background: #9AD204 !important; color: #000000 !important;';
+            if ($ratio <= 0.40) return 'background: #76BE01 !important; color: #000000 !important;';
+            if ($ratio <= 0.50) return 'background: #5DAD01 !important; color: #000000 !important;';
+            if ($ratio <= 0.60) return 'background: #50A403 !important; color: #000000 !important;';
+            if ($ratio <= 0.70) return 'background: #3C8F01 !important; color: #000000 !important;';
+            if ($ratio <= 0.80) return 'background: #2D7C01 !important; color: #FFFFFF !important;';
+            if ($ratio <= 0.90) return 'background: #195D00 !important; color: #FFFFFF !important;'; // Para verdes oscuros, usamos texto blanco
+            return 'background: #114C00 !important; color: #FFFFFF !important;'; // Verde militar fuerte personalizado
         }
     }
     ?>
@@ -1215,11 +1338,17 @@ if (isset($resultados['actual'])) {
                         $idx_anom++;
                         $label_text = $anomalias_labels[$anomalia] ?? strtoupper(str_replace('_', ' ', $anomalia));
                     ?>
-                        <th colspan="4" class="<?php echo $grp_class; ?> b-left" data-anom-group="<?php echo $anomalia; ?>"><?php echo $label_text; ?></th>
-                        <th colspan="1" class="<?php echo $grp_class; ?> reinc-col" data-anom-group="<?php echo $anomalia; ?>" style="background-color: #fce4ec !important; color: #000 !important;">REINC.</th>
+                        <th colspan="3" class="<?php echo $grp_class; ?> b-left" data-anom-group="<?php echo $anomalia; ?>"><?php echo $label_text; ?></th>
                     <?php endforeach; ?>
 
-                    <th colspan="4" class="th-defecto-group b-left">DEFECTOS TOTALES</th>
+                    <th colspan="4" class="th-defecto-group b-left" style="white-space: nowrap;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; flex-wrap: nowrap;">
+                            DEFECTOS TOTALES
+                            <button type="button" class="ea-sort-heatmap-btn" title="Ordenar por diferencia total y ver mapa de calor" style="margin: 0; padding: 0;">
+                                <span class="material-symbols-rounded" style="font-size: 16px; font-weight: bold;">arrow_downward</span>
+                            </button>
+                        </div>
+                    </th>
                 </tr>
 
                 <tr>
@@ -1228,7 +1357,7 @@ if (isset($resultados['actual'])) {
                         <th class="th-sub" data-anom-sub="<?php echo $anomalia; ?>"><?php echo $th_bimestre; ?></th>
                         <th class="th-sub" data-anom-sub="<?php echo $anomalia; ?>">DIF</th>
                         <th class="th-evol evol-col" data-anom-sub="<?php echo $anomalia; ?>">% Evol</th>
-                        <th class="th-sub reinc-col" data-anom-sub="<?php echo $anomalia; ?>" style="background-color: #fce4ec !important; color: #000 !important;">REINC.</th>
+                        <th class="th-sub reinc-col" data-anom-sub="<?php echo $anomalia; ?>" style="background-color: #ffbf80 !important; color: #000 !important;">REINC.</th>
                     <?php endforeach; ?>
 
                     <th class="th-defecto-sub b-left"><?php echo $th_actual; ?></th>
@@ -1249,52 +1378,57 @@ if (isset($resultados['actual'])) {
                     $gran_defecto_bimestre = 0;
 
                     // Orden personalizado de agencias
-                    $orden_agencias = ['CENTRO','NORTE','SUR','ORIENTE','PONIENTE','PROGRESO','HUNUCMA','UMAN','ACANCEH','CONKAL'];
+                    $orden_agencias = ['CENTRO','NORTE','SUR','ORIENTE','PONIENTE','PROGRESO','HUNUCMA','UMAN','ACANCEH','CONKAL','MOTUL'];
                     
-                    // Recopilar todas las agencias de todas las zonas
-                    $todas_agencias = [];
-                    foreach ($lista_zonas as $z) {
-                        foreach (array_keys($combinaciones_existentes[$z]) as $ag) {
-                            if (!isset($todas_agencias[$ag])) {
-                                $todas_agencias[$ag] = $z; // guardar la zona de origen
+                    // Pre-calcular sumas de resultados por agencia y anomalía sumando sobre las zonas seleccionadas/disponibles
+                    $resultados_finales = [
+                        'actual' => [],
+                        'bimestre' => []
+                    ];
+                    foreach ($orden_agencias as $agencia) {
+                        foreach ($anomalias as $anomalia) {
+                            $sum_actual = 0;
+                            $sum_bimestre = 0;
+                            foreach ($lista_zonas as $z) {
+                                if (isset($resultados['actual'][$z][$agencia][$anomalia])) {
+                                    $sum_actual += $resultados['actual'][$z][$agencia][$anomalia];
+                                }
+                                if (isset($resultados['bimestre'][$z][$agencia][$anomalia])) {
+                                    $sum_bimestre += $resultados['bimestre'][$z][$agencia][$anomalia];
+                                }
                             }
+                            $resultados_finales['actual'][$agencia][$anomalia] = $sum_actual;
+                            $resultados_finales['bimestre'][$agencia][$anomalia] = $sum_bimestre;
                         }
-                    }
-                    
-                    // Ordenar según el orden personalizado
-                    $agencias_ordenadas = [];
-                    foreach ($orden_agencias as $ag_ord) {
-                        if (isset($todas_agencias[$ag_ord])) {
-                            $agencias_ordenadas[] = ['agencia' => $ag_ord, 'zona' => $todas_agencias[$ag_ord]];
-                            unset($todas_agencias[$ag_ord]);
-                        }
-                    }
-                    // Agregar agencias que no estén en el orden personalizado al final
-                    foreach ($todas_agencias as $ag => $z) {
-                        $agencias_ordenadas[] = ['agencia' => $ag, 'zona' => $z];
                     }
 
                     // Pre-calcular promedios ajustados para las columnas de % Evol en el Reporte Zona
                     $evols_por_columna = [];
                     $evols_def_columna = [];
-                    foreach ($agencias_ordenadas as $ag_info) {
-                        $ag_name = $ag_info['agencia'];
-                        $z_name = $ag_info['zona'];
+                    foreach ($orden_agencias as $ag_name) {
                         $def_act = 0;
                         $def_bim = 0;
                         foreach ($anomalias as $anomalia) {
-                            $val_act = $resultados['actual'][$z_name][$ag_name][$anomalia] ?? 0;
-                            $val_bim = $resultados['bimestre'][$z_name][$ag_name][$anomalia] ?? 0;
+                            $val_act = $resultados_finales['actual'][$ag_name][$anomalia] ?? 0;
+                            $val_bim = $resultados_finales['bimestre'][$ag_name][$anomalia] ?? 0;
                             $def_act += $val_act;
                             $def_bim += $val_bim;
                             $diff = $val_act - $val_bim;
-                            $ev = ($val_bim != 0) ? (($diff / $val_bim) * 100) : null;
+                            if ($val_bim == 0) {
+                                $ev = ($val_act == 0) ? 0.0 : 100.0;
+                            } else {
+                                $ev = ($diff / $val_bim) * 100;
+                            }
                             if ($ev !== null && abs($ev) > 0.01) {
                                 $evols_por_columna[$anomalia][] = abs($ev);
                             }
                         }
                         $diff_def = $def_act - $def_bim;
-                        $ev_def = ($def_bim != 0) ? (($diff_def / $def_bim) * 100) : null;
+                        if ($def_bim == 0) {
+                            $ev_def = ($def_act == 0) ? 0.0 : 100.0;
+                        } else {
+                            $ev_def = ($diff_def / $def_bim) * 100;
+                        }
                         if ($ev_def !== null && abs($ev_def) > 0.01) {
                             $evols_def_columna[] = abs($ev_def);
                         }
@@ -1304,20 +1438,35 @@ if (isset($resultados['actual'])) {
                         $vals = isset($evols_por_columna[$anomalia]) ? $evols_por_columna[$anomalia] : [];
                         $max_evol[$anomalia] = empty($vals) ? 0 : max($vals);
                     }
-                    $max_evol['defectos'] = empty($evols_def_columna) ? 0 : max($evols_def_columna);
+                    $max_evol['defectos'] = empty($max_evol) ? 0 : max($max_evol);
 
-                    foreach ($agencias_ordenadas as $ag_info):
-                        $agencia = $ag_info['agencia'];
-                        $zona = $ag_info['zona'];
+                    $idx_row = 0;
+                    foreach ($orden_agencias as $agencia):
+                        if ($agencia === 'MOTUL') {
+                            $total_motul = 0;
+                            foreach ($anomalias as $anomalia) {
+                                $total_motul += ($resultados_finales['actual'][$agencia][$anomalia] ?? 0);
+                                $total_motul += ($resultados_finales['bimestre'][$agencia][$anomalia] ?? 0);
+                            }
+                            if ($total_motul == 0) {
+                                continue;
+                            }
+                        }
+                        $zona_det = ($filtro_zona !== '') ? $filtro_zona : '';
                         $defecto_fila_actual = 0;
                         $defecto_fila_bimestre = 0;
+                        foreach ($anomalias as $anom) {
+                            $defecto_fila_actual += $resultados_finales['actual'][$agencia][$anom] ?? 0;
+                            $defecto_fila_bimestre += $resultados_finales['bimestre'][$agencia][$anom] ?? 0;
+                        }
+                        $dif_defecto_fila = $defecto_fila_actual - $defecto_fila_bimestre;
                             ?>
-                            <tr>
+                            <tr data-orig-index="<?php echo $idx_row++; ?>" data-total="<?php echo $defecto_fila_actual; ?>" data-dif-total="<?php echo $dif_defecto_fila; ?>">
                                 <td class="ea-td-agencia" style="border-right: 1px solid #000;"><?php echo $agencia; ?></td>
 
                                 <?php foreach ($anomalias as $anomalia):
-                                    $val_actual = $resultados['actual'][$zona][$agencia][$anomalia];
-                                    $val_bimestre = $resultados['bimestre'][$zona][$agencia][$anomalia];
+                                    $val_actual = $resultados_finales['actual'][$agencia][$anomalia] ?? 0;
+                                    $val_bimestre = $resultados_finales['bimestre'][$agencia][$anomalia] ?? 0;
                                     $diferencia = $val_actual - $val_bimestre;
 
                                     $defecto_fila_actual += $val_actual;
@@ -1328,38 +1477,39 @@ if (isset($resultados['actual'])) {
                                     $clase_dif = $diferencia > 0 ? 'dif-pos' : ($diferencia < 0 ? 'dif-neg' : 'dif-zero');
                                     $signo = $diferencia > 0 ? '+' : '';
                                     
-                                    // Reincidentes: se actualizarán via AJAX, solo generamos la celda con datos-id
+                                    // Arreglo de ciclos que corresponden a la celda actual
+                                    $ciclos_celda = ($anomalia === 'cargas_directas' && !empty($filtro_ciclo_cd)) ? $filtro_ciclo_cd : $filtro_ciclo;
                                     ?>
 
-                                    <td class="b-left ea-td-num <?php echo $val_actual > 0 ? 'ea-td-num--val' : ''; ?>" data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="actual" data-raw="<?php echo $val_actual; ?>">
+                                    <td class="b-left ea-td-num <?php echo $val_actual > 0 ? 'ea-td-num--val' : ''; ?>" data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="actual" data-raw="<?php echo $val_actual; ?>" data-val="<?php echo $val_actual; ?>">
                                         <?php if ($val_actual > 0): ?>
                                             <a href="javascript:void(0)" class="ea-detail-trigger" 
                                                data-tabla="<?php echo $anomalia . $sufijos['actual']; ?>" 
                                                data-agencia="<?php echo $agencia; ?>" 
-                                               data-zona="<?php echo $zona; ?>"
-                                               data-ciclo="<?php echo htmlspecialchars(implode(',', $filtro_ciclo)); ?>"
-                                               data-titulo="<?php echo strtoupper(str_replace('_', ' ', $anomalia)) . ' - ' . $agencia . ' (ZONA ' . $zona . ')'; ?>">
+                                               data-zona="<?php echo $zona_det; ?>"
+                                               data-ciclo="<?php echo htmlspecialchars(implode(',', $ciclos_celda)); ?>"
+                                               data-titulo="<?php echo strtoupper(str_replace('_', ' ', $anomalia)) . ' - ' . $agencia . ($zona_det !== '' ? ' (ZONA ' . $zona_det . ')' : ''); ?>">
                                                 <?php echo number_format($val_actual); ?>
                                             </a>
                                         <?php else: ?>
                                             <span class="ea-zero">0</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="ea-td-num <?php echo $val_bimestre > 0 ? 'ea-td-num--val' : ''; ?>" data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="bimestre" data-raw="<?php echo $val_bimestre; ?>">
+                                    <td class="ea-td-num <?php echo $val_bimestre > 0 ? 'ea-td-num--val' : ''; ?>" data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="bimestre" data-raw="<?php echo $val_bimestre; ?>" data-val="<?php echo $val_bimestre; ?>">
                                         <?php if ($val_bimestre > 0): ?>
                                             <a href="javascript:void(0)" class="ea-detail-trigger" 
                                                data-tabla="<?php echo $anomalia . $sufijos['bimestre']; ?>" 
                                                data-agencia="<?php echo $agencia; ?>" 
-                                               data-zona="<?php echo $zona; ?>"
-                                               data-ciclo="<?php echo htmlspecialchars(implode(',', $filtro_ciclo)); ?>"
-                                               data-titulo="<?php echo strtoupper(str_replace('_', ' ', $anomalia)) . ' - ' . $agencia . ' (ZONA ' . $zona . ') ' . $th_bimestre; ?>">
+                                               data-zona="<?php echo $zona_det; ?>"
+                                               data-ciclo="<?php echo htmlspecialchars(implode(',', $ciclos_celda)); ?>"
+                                               data-titulo="<?php echo strtoupper(str_replace('_', ' ', $anomalia)) . ' - ' . $agencia . ($zona_det !== '' ? ' (ZONA ' . $zona_det . ')' : '') . ' ' . $th_bimestre; ?>">
                                                 <?php echo number_format($val_bimestre); ?>
                                             </a>
                                         <?php else: ?>
                                             <span class="ea-zero">0</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="ea-td-num td-dif <?php echo $clase_dif; ?>" data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="dif">
+                                    <td class="ea-td-num td-dif <?php echo $clase_dif; ?>" data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="dif" data-raw="<?php echo $diferencia; ?>" data-val="<?php echo $diferencia; ?>">
                                         <div class="dif-content">
                                             <?php if ($diferencia > 0): ?>
                                                 <svg class="dif-icon-svg" width="24" height="13" viewBox="0 0 10 10" preserveAspectRatio="none"><polygon points="0,0 10,0 5,10" fill="#C00000"/></svg>
@@ -1374,22 +1524,26 @@ if (isset($resultados['actual'])) {
                                         </div>
                                     </td>
                                     <?php
-                                    $evol = ($val_bimestre != 0) ? (($diferencia / $val_bimestre) * 100) : null;
+                                    if ($val_bimestre == 0) {
+                                        $evol = ($val_actual == 0) ? 0.0 : 100.0;
+                                    } else {
+                                        $evol = ($diferencia / $val_bimestre) * 100;
+                                    }
                                     $evol_style = evolStyle($evol, $max_evol[$anomalia]);
                                     ?>
                                     <td class="ea-td-evol evol-col" data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="evol" data-raw-act="<?php echo $val_actual; ?>" data-raw-bim="<?php echo $val_bimestre; ?>" style="<?php echo $evol_style; ?>">
                                         <?php echo $evol !== null ? (($evol > 0 ? '+' : '') . number_format($evol, 1) . '%') : '—'; ?>
                                     </td>
                                     <td class="ea-td-num reinc-cell reinc-col" 
-                                        data-zona="<?php echo htmlspecialchars($zona); ?>"
+                                        data-zona="<?php echo htmlspecialchars($zona_det); ?>"
                                         data-agencia="<?php echo htmlspecialchars($agencia); ?>"
                                         data-anomalia="<?php echo htmlspecialchars($anomalia); ?>"
                                         data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="reinc"
                                         data-tabla="<?php echo $anomalia . $sufijos['actual']; ?>"
                                         data-tablacomp="<?php echo $anomalia . $sufijos['bimestre']; ?>"
-                                        data-ciclo="<?php echo htmlspecialchars(implode(',', $filtro_ciclo)); ?>"
-                                        data-titulo="REINCIDENTES - <?php echo strtoupper(str_replace('_', ' ', $anomalia)) . ' - ' . $agencia . ' (ZONA ' . $zona . ')'; ?>"
-                                        style="background-color: #fdf5f6;">
+                                        data-ciclo="<?php echo htmlspecialchars(implode(',', $ciclos_celda)); ?>"
+                                        data-titulo="REINCIDENTES - <?php echo strtoupper(str_replace('_', ' ', $anomalia)) . ' - ' . $agencia . ($zona_det !== '' ? ' (ZONA ' . $zona_det . ')' : ''); ?>"
+                                        style="background-color: #ffe6cc !important;">
                                         <span class="reinc-valor"><span class="ea-dots-loader"><span></span><span></span><span></span></span></span>
                                     </td>
 
@@ -1399,12 +1553,16 @@ if (isset($resultados['actual'])) {
                                 $dif_defecto = $defecto_fila_actual - $defecto_fila_bimestre;
                                 $clase_dif_defecto = $dif_defecto > 0 ? 'dif-pos' : ($dif_defecto < 0 ? 'dif-neg' : 'dif-zero');
                                 $signo_defecto = $dif_defecto > 0 ? '+' : '';
-                                $evol_def = ($defecto_fila_bimestre != 0) ? (($dif_defecto / $defecto_fila_bimestre) * 100) : null;
+                                if ($defecto_fila_bimestre == 0) {
+                                    $evol_def = ($defecto_fila_actual == 0) ? 0.0 : 100.0;
+                                } else {
+                                    $evol_def = ($dif_defecto / $defecto_fila_bimestre) * 100;
+                                }
                                 $evol_def_style = evolStyle($evol_def, $max_evol['defectos']);
                                 ?>
-                                <td class="b-left ea-td-defecto"><?php echo number_format($defecto_fila_actual); ?></td>
-                                <td class="ea-td-defecto"><?php echo number_format($defecto_fila_bimestre); ?></td>
-                                <td class="ea-td-defecto td-dif <?php echo $clase_dif_defecto; ?>">
+                                <td class="b-left ea-td-defecto" data-cell-type="actual" data-raw="<?php echo $defecto_fila_actual; ?>" data-val="<?php echo $defecto_fila_actual; ?>"><?php echo number_format($defecto_fila_actual); ?></td>
+                                <td class="ea-td-defecto" data-cell-type="bimestre" data-raw="<?php echo $defecto_fila_bimestre; ?>" data-val="<?php echo $defecto_fila_bimestre; ?>"><?php echo number_format($defecto_fila_bimestre); ?></td>
+                                <td class="ea-td-defecto td-dif <?php echo $clase_dif_defecto; ?>" data-cell-type="dif" data-raw="<?php echo $dif_defecto; ?>" data-val="<?php echo $dif_defecto; ?>">
                                     <div class="dif-content">
                                         <?php if ($dif_defecto > 0): ?>
                                             <svg class="dif-icon-svg" width="24" height="13" viewBox="0 0 10 10" preserveAspectRatio="none"><polygon points="0,0 10,0 5,10" fill="#C00000"/></svg>
@@ -1460,13 +1618,17 @@ if (isset($resultados['actual'])) {
                                 </div>
                             </td>
                             <?php
-                            $tot_evol = ($tot_bim != 0) ? (($tot_dif / $tot_bim) * 100) : null;
+                            if ($tot_bim == 0) {
+                                $tot_evol = ($tot_act == 0) ? 0.0 : 100.0;
+                            } else {
+                                $tot_evol = ($tot_dif / $tot_bim) * 100;
+                            }
                             $tot_evol_style = evolStyle($tot_evol, $max_evol[$anomalia]);
                             ?>
                             <td class="ea-td-evol evol-col" data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="evol" data-raw-act="<?php echo $tot_act; ?>" data-raw-bim="<?php echo $tot_bim; ?>" style="<?php echo $tot_evol_style; ?>">
                                 <?php echo $tot_evol !== null ? (($tot_evol > 0 ? '+' : '') . number_format($tot_evol, 1) . '%') : '—'; ?>
                             </td>
-                            <td class="ea-td-num reinc-total reinc-col" data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="reinc" data-anomalia="<?php echo htmlspecialchars($anomalia); ?>" style="background-color: #f8d7da; color: #842029; font-weight: bold;">
+                            <td class="ea-td-num reinc-total reinc-col" data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="reinc" data-anomalia="<?php echo htmlspecialchars($anomalia); ?>" style="background-color: #ffa64d !important; color: #000000 !important; font-weight: bold;">
                                 <span class="reinc-total-valor"><span class="ea-dots-loader"><span></span><span></span><span></span></span></span>
                             </td>
                         <?php endforeach; ?>
@@ -1475,7 +1637,11 @@ if (isset($resultados['actual'])) {
                         $gran_dif_defecto = $gran_defecto_actual - $gran_defecto_bimestre;
                         $clase_gran_dif = $gran_dif_defecto > 0 ? 'dif-pos' : ($gran_dif_defecto < 0 ? 'dif-neg' : 'dif-zero');
                         $signo_gran = $gran_dif_defecto > 0 ? '+' : '';
-                        $gran_evol_def = ($gran_defecto_bimestre != 0) ? (($gran_dif_defecto / $gran_defecto_bimestre) * 100) : null;
+                        if ($gran_defecto_bimestre == 0) {
+                            $gran_evol_def = ($gran_defecto_actual == 0) ? 0.0 : 100.0;
+                        } else {
+                            $gran_evol_def = ($gran_dif_defecto / $gran_defecto_bimestre) * 100;
+                        }
                         $gran_evol_style = evolStyle($gran_evol_def, $max_evol['defectos']);
                         ?>
                         <td class="b-left ea-td-defecto"><?php echo number_format($gran_defecto_actual); ?></td>
@@ -1535,6 +1701,29 @@ if (isset($resultados['actual'])) {
 </div>
 
 <style>
+    /* Botón de Mapa de Calor y Ordenamiento */
+    .ea-sort-heatmap-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #b0bec5; /* Gris apagado por defecto */
+        display: inline-flex;
+        align-items: center;
+        padding: 2px;
+        transition: all 0.2s ease-in-out;
+        border-radius: 4px;
+        vertical-align: middle;
+        margin-left: 4px;
+    }
+    .ea-sort-heatmap-btn:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+        color: #e65100; /* Naranja en hover */
+    }
+    .ea-sort-heatmap-btn.active {
+        color: #e65100 !important; /* Naranja activo */
+        transform: scale(1.1);
+    }
+
     .ea-modal {
         display: none;
         position: fixed;
@@ -1600,30 +1789,15 @@ if (isset($resultados['actual'])) {
             let rangeStartIdx = null;
 
             function updateText() {
-                const checked = chkCiclos.filter(c => c.checked);
-                if (checked.length === 0 || checked.length === chkCiclos.length) {
-                    text.textContent = 'TODOS';
+                const checked = chkCiclos.filter(c => c.checked && !c.disabled);
+                
+                if (checked.length === 0) {
+                    text.textContent = 'Ninguno';
                 } else if (checked.length === 1) {
                     text.textContent = checked[0].value;
                 } else {
-                    // Obtener valores numéricos y ordenar
                     const vals = checked.map(c => parseInt(c.value)).sort((a, b) => a - b);
-                    // Verificar si forman una secuencia con paso constante
-                    const step = vals[1] - vals[0];
-                    let esSecuencia = step > 0;
-                    for (let i = 2; i < vals.length; i++) {
-                        if (vals[i] - vals[i - 1] !== step) {
-                            esSecuencia = false;
-                            break;
-                        }
-                    }
-                    if (esSecuencia) {
-                        text.textContent = vals[0] + ' AL ' + vals[vals.length - 1];
-                    } else if (vals.length <= 4) {
-                        text.textContent = vals.join(', ');
-                    } else {
-                        text.textContent = checked.length + ' sel.';
-                    }
+                    text.textContent = vals[0] + ' AL ' + vals[vals.length - 1];
                 }
             }
 
@@ -1657,21 +1831,28 @@ if (isset($resultados['actual'])) {
                     btnIndiv.style.border = '1px solid #ced4da';
 
                     // Sincronización absoluta: autoseleccionar el rango si hay elementos previamente marcados
-                    const checkedIndices = chkCiclos.map((c, i) => c.checked ? i : -1).filter(idx => idx !== -1);
+                    const checkedIndices = chkCiclos.map((c, i) => (c.checked && !c.disabled) ? i : -1).filter(idx => idx !== -1);
                     if (checkedIndices.length > 0) {
                         const minIdx = Math.min(...checkedIndices);
                         const maxIdx = Math.max(...checkedIndices);
                         for (let i = minIdx; i <= maxIdx; i++) {
-                            chkCiclos[i].checked = true;
+                            if (!chkCiclos[i].disabled) {
+                                chkCiclos[i].checked = true;
+                            }
                         }
-                        chkSelectAll.checked = chkCiclos.every(c => c.checked);
+                        const enabled = chkCiclos.filter(c => !c.disabled);
+                        chkSelectAll.checked = enabled.length > 0 && enabled.every(c => c.checked);
                         updateText();
                     }
                 });
             }
 
             chkSelectAll.addEventListener('change', (e) => {
-                chkCiclos.forEach(chk => chk.checked = e.target.checked);
+                chkCiclos.forEach(chk => {
+                    if (!chk.disabled) {
+                        chk.checked = e.target.checked;
+                    }
+                });
                 updateText();
                 rangeStartIdx = null;
                 lblCiclos.forEach(lbl => lbl.style.backgroundColor = 'transparent');
@@ -1684,7 +1865,9 @@ if (isset($resultados['actual'])) {
                             // Primer click del rango: se toma como límite superior y se selecciona desde el inicio
                             const valToSet = chkCiclos[idx].checked;
                             for (let i = 0; i <= idx; i++) {
-                                chkCiclos[i].checked = valToSet;
+                                if (!chkCiclos[i].disabled) {
+                                    chkCiclos[i].checked = valToSet;
+                                }
                             }
                             rangeStartIdx = idx;
                             lblCiclos.forEach(lbl => lbl.style.backgroundColor = 'transparent');
@@ -1695,13 +1878,16 @@ if (isset($resultados['actual'])) {
                             const end = Math.max(rangeStartIdx, idx);
                             const valToSet = chkCiclos[rangeStartIdx].checked;
                             for (let i = start; i <= end; i++) {
-                                chkCiclos[i].checked = valToSet;
+                                if (!chkCiclos[i].disabled) {
+                                    chkCiclos[i].checked = valToSet;
+                                }
                             }
                             rangeStartIdx = null;
                             lblCiclos.forEach(lbl => lbl.style.backgroundColor = 'transparent');
                         }
                     }
-                    chkSelectAll.checked = chkCiclos.length > 0 && chkCiclos.every(c => c.checked);
+                    const enabled = chkCiclos.filter(c => !c.disabled);
+                    chkSelectAll.checked = enabled.length > 0 && enabled.every(c => c.checked);
                     updateText();
                 });
             });
@@ -1717,8 +1903,14 @@ if (isset($resultados['actual'])) {
 
             // Inicializar texto y checkbox 'Select All'
             if(chkCiclos.length > 0) {
-                chkSelectAll.checked = chkCiclos.every(c => c.checked);
-                updateText();
+                const enabled = chkCiclos.filter(c => !c.disabled);
+                chkSelectAll.checked = enabled.length > 0 && enabled.every(c => c.checked);
+                const chkIcf = document.getElementById('chk-icf-total');
+                if (chkIcf && chkIcf.checked) {
+                    text.textContent = 'TODOS';
+                } else {
+                    updateText();
+                }
             }
         });
 
@@ -1735,6 +1927,69 @@ if (isset($resultados['actual'])) {
         const total = <?php echo $total_registros_analisis; ?>;
         const placeholder = document.getElementById('total-registros-placeholder');
         if(placeholder) placeholder.textContent = total.toLocaleString();
+
+        // ── Filtrado dinámico de ciclos por zona ──────────────────────────────
+        // Cuando el usuario cambia el select de zona (antes de enviar el form),
+        // se deshabilitan los checkboxes de ciclos que no tienen datos en esa zona.
+        // No se toca el estilo rojo/negrilla de la regla $no_pasa_regla.
+        (function () {
+            const ciclosPorZona = <?php echo json_encode($ciclos_por_zona, JSON_NUMERIC_CHECK); ?>;
+
+            const selectZona = document.getElementById('zona');
+            if (!selectZona) return;
+
+            function aplicarFiltroZonaCiclos() {
+                const zonaVal = selectZona.value;
+                const ciclosDisponibles = (zonaVal !== '' && ciclosPorZona[zonaVal])
+                    ? ciclosPorZona[zonaVal]
+                    : null; // null = todas las zonas, sin restricción
+
+                document.querySelectorAll('.chk-ciclo').forEach(function (chk) {
+                    const ciclo = parseInt(chk.value);
+                    const lbl = chk.closest('label');
+                    const sinDatos = ciclosDisponibles !== null && !ciclosDisponibles.includes(ciclo);
+
+                    if (sinDatos) {
+                        chk.disabled = true;
+                        chk.checked = false;
+                        if (lbl) lbl.style.display = 'none';
+                    } else {
+                        chk.disabled = false;
+                        if (lbl) lbl.style.display = '';
+                    }
+                });
+
+                // Sincronizar el estado del "Seleccionar todo" de cada dropdown
+                document.querySelectorAll('.ea-dropdown-checkboxes').forEach(function (dropdown) {
+                    const chkAll = dropdown.querySelector('.chkSelectAllCiclo');
+                    const chks = Array.from(dropdown.querySelectorAll('.chk-ciclo'));
+                    const textEl = dropdown.querySelector('.ea-dropdown-text');
+                    if (!chkAll || chks.length === 0) return;
+
+                    const enabled = chks.filter(c => !c.disabled);
+                    chkAll.checked = enabled.length > 0 && enabled.every(c => c.checked);
+
+                    // Actualizar texto del toggle
+                    const checked = chks.filter(c => c.checked && !c.disabled);
+                    if (textEl) {
+                        if (checked.length === 0) {
+                            textEl.textContent = 'Ninguno';
+                        } else if (checked.length === 1) {
+                            textEl.textContent = checked[0].value;
+                        } else {
+                            const vals = checked.map(c => parseInt(c.value)).sort((a, b) => a - b);
+                            textEl.textContent = vals[0] + ' AL ' + vals[vals.length - 1];
+                        }
+                    }
+                });
+            }
+
+            selectZona.addEventListener('change', aplicarFiltroZonaCiclos);
+
+            // Aplicar al cargar la página si ya hay una zona seleccionada
+            aplicarFiltroZonaCiclos();
+        })();
+        // ─────────────────────────────────────────────────────────────────────
 
         // Lógica del Modal
         const modal = document.getElementById('ea-modal');
@@ -1769,6 +2024,235 @@ if (isset($resultados['actual'])) {
 
         closeBtn.onclick = () => modal.style.display = 'none';
         window.onclick = (event) => { if (event.target == modal) modal.style.display = 'none'; }
+
+        // Delegar los eventos de los badges de historial de reincidencia dentro del modal
+        if (modalBody) {
+            modalBody.addEventListener('click', function(e) {
+                const badge = e.target.closest('.reinc-history-badge');
+                if (!badge) return;
+                
+                e.stopPropagation();
+                const rpu = badge.dataset.rpu;
+                const prefix = badge.dataset.prefix;
+                const tabla = badge.dataset.tabla;
+                const parentRow = badge.closest('tr');
+                
+                let nextRow = parentRow.nextElementSibling;
+                if (nextRow && nextRow.classList.contains('reinc-history-row')) {
+                    if (nextRow.style.display === 'none') {
+                        nextRow.style.display = '';
+                        badge.style.transform = 'scale(1.2)';
+                        badge.style.boxShadow = '0 0 8px rgba(220, 53, 69, 0.6)';
+                    } else {
+                        nextRow.style.display = 'none';
+                        badge.style.transform = '';
+                        badge.style.boxShadow = '';
+                    }
+                    return;
+                }
+                
+                const colsCount = parentRow.cells.length;
+                const newRow = document.createElement('tr');
+                newRow.className = 'reinc-history-row';
+                
+                const cell = document.createElement('td');
+                cell.colSpan = colsCount;
+                cell.style.padding = '0';
+                cell.style.backgroundColor = '#f8fafc';
+                cell.innerHTML = `
+                    <div style="padding: 15px; display: flex; align-items: center; gap: 10px; color: #475569;">
+                        <div class="ea-spinner" style="width: 16px; height: 16px; border: 2px solid #cbd5e1; border-top-color: #dc3545; border-radius: 50%; animation: ea-spin-anim 0.8s linear infinite;"></div>
+                        <span style="font-size: 0.75rem; font-weight: 500; font-family: sans-serif;">Consultando base de datos histórica...</span>
+                    </div>
+                    <style>
+                        @keyframes ea-spin-anim {
+                            to { transform: rotate(360deg); }
+                        }
+                    </style>
+                `;
+                newRow.appendChild(cell);
+                parentRow.after(newRow);
+                
+                badge.style.transform = 'scale(1.2)';
+                badge.style.boxShadow = '0 0 8px rgba(220, 53, 69, 0.6)';
+                
+                fetch(`get_historial_rpu.php?rpu=${encodeURIComponent(rpu)}&prefix=${encodeURIComponent(prefix)}&tabla=${encodeURIComponent(tabla)}`)
+                    .then(r => {
+                        if (!r.ok) throw new Error();
+                        return r.text();
+                    })
+                    .then(html => {
+                        cell.innerHTML = html;
+                    })
+                    .catch(() => {
+                        cell.innerHTML = `<div style="padding: 12px; color: #dc3545; font-size: 0.75rem; font-family: sans-serif;">Error al cargar el historial de reincidencias de este RPU.</div>`;
+                    });
+            });
+
+            modalBody.addEventListener('mouseover', function(e) {
+                const badge = e.target.closest('.reinc-history-badge');
+                if (!badge) return;
+                const nextRow = badge.closest('tr').nextElementSibling;
+                const isOpen = nextRow && nextRow.classList.contains('reinc-history-row') && nextRow.style.display !== 'none';
+                if (!isOpen) {
+                    badge.style.transform = 'scale(1.15)';
+                }
+            });
+
+            modalBody.addEventListener('mouseout', function(e) {
+                const badge = e.target.closest('.reinc-history-badge');
+                if (!badge) return;
+                const nextRow = badge.closest('tr').nextElementSibling;
+                const isOpen = nextRow && nextRow.classList.contains('reinc-history-row') && nextRow.style.display !== 'none';
+                if (!isOpen) {
+                    badge.style.transform = '';
+                    badge.style.boxShadow = '';
+                }
+            });
+        }
+
+        // ─── LÓGICA DE MAPA DE CALOR Y ORDENAMIENTO (ZONA) ─────────────────────
+        function getHeatmapStyleJS(val, max) {
+            if (val === null || max <= 0) return { bg: '#FFFFFF', text: '#000000' };
+            const v = parseFloat(val);
+            if (Math.abs(v) < 0.01) return { bg: '#FFFFFF', text: '#000000' };
+
+            const ratio = Math.abs(v) / max;
+            if (v > 0) {
+                // Positivos (Incremento de anomalías - "Malo")
+                if (ratio <= 0.10) return { bg: '#FFFFDF', text: '#000000' };
+                if (ratio <= 0.20) return { bg: '#FFFFB8', text: '#000000' };
+                if (ratio <= 0.30) return { bg: '#FFFF94', text: '#000000' };
+                if (ratio <= 0.40) return { bg: '#FDF190', text: '#000000' };
+                if (ratio <= 0.50) return { bg: '#FCEB93', text: '#000000' };
+                if (ratio <= 0.60) return { bg: '#F9D08D', text: '#000000' };
+                if (ratio <= 0.70) return { bg: '#EBCA8F', text: '#000000' };
+                if (ratio <= 0.80) return { bg: '#F1AA87', text: '#000000' };
+                if (ratio <= 0.90) return { bg: '#F08B82', text: '#000000' };
+                return { bg: '#F26A6A', text: '#000000' };
+            } else {
+                // Negativos (Reducción de anomalías - "Bueno") - Paleta de tabla de comparación
+                if (ratio <= 0.10) return { bg: '#CAEC07', text: '#000000' };
+                if (ratio <= 0.20) return { bg: '#B2E005', text: '#000000' };
+                if (ratio <= 0.30) return { bg: '#9AD204', text: '#000000' };
+                if (ratio <= 0.40) return { bg: '#76BE01', text: '#000000' };
+                if (ratio <= 0.50) return { bg: '#5DAD01', text: '#000000' };
+                if (ratio <= 0.60) return { bg: '#50A403', text: '#000000' };
+                if (ratio <= 0.70) return { bg: '#3C8F01', text: '#000000' };
+                if (ratio <= 0.80) return { bg: '#2D7C01', text: '#FFFFFF' };
+                if (ratio <= 0.90) return { bg: '#195D00', text: '#FFFFFF' };
+                return { bg: '#114C00', text: '#FFFFFF' };
+            }
+        }
+
+        window.refreshHeatmap = function() {
+            const btn = document.querySelector('.ea-sort-heatmap-btn');
+            if (!btn || !btn.classList.contains('active')) return;
+            
+            const table = document.getElementById('tabla-zona-main');
+            if (!table) return;
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+            const rows = Array.from(tbody.querySelectorAll('tr:not(.ea-tr-total)'));
+            if (rows.length === 0) return;
+            
+            const numCols = rows[0].children.length;
+            // Máximos separados: positivo y negativo por columna
+            const colMaxPos = {};
+            const colMaxNeg = {};
+            
+            // Calcular el máximo positivo y el máximo negativo (en abs) de cada columna DIF por separado.
+            // Esto garantiza que el pico positivo siempre tenga ratio=1.0 (rojo más fuerte) y el
+            // pico negativo también tenga ratio=1.0 (verde más fuerte), sin que se "apaguen" mutuamente.
+            for (let colIdx = 1; colIdx < numCols; colIdx++) {
+                let maxPos = 0;
+                let maxNeg = 0;
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells[colIdx] && cells[colIdx].getAttribute('data-cell-type') === 'dif' && cells[colIdx].hasAttribute('data-val')) {
+                        const val = parseFloat(cells[colIdx].getAttribute('data-val')) || 0;
+                        if (val > 0 && val > maxPos) maxPos = val;
+                        if (val < 0 && Math.abs(val) > maxNeg) maxNeg = Math.abs(val);
+                    }
+                });
+                colMaxPos[colIdx] = maxPos;
+                colMaxNeg[colIdx] = maxNeg;
+            }
+            
+            // Aplicar colores de mapa de calor (solo a celdas DIF)
+            rows.forEach(row => {
+                row.querySelectorAll('td').forEach((td, colIdx) => {
+                    if (td.getAttribute('data-cell-type') === 'dif' && td.hasAttribute('data-val')) {
+                        const val = parseFloat(td.getAttribute('data-val')) || 0;
+                        // Usar el máximo del mismo signo para que el pico de cada dirección sea siempre ratio=1.0
+                        const max = val >= 0 ? (colMaxPos[colIdx] || 0) : (colMaxNeg[colIdx] || 0);
+                        const style = getHeatmapStyleJS(val, max);
+                        td.style.backgroundColor = style.bg;
+                        td.style.setProperty('background-color', style.bg, 'important');
+                        td.style.color = style.text;
+                        td.style.setProperty('color', style.text, 'important');
+                    }
+                });
+            });
+        };
+
+        document.querySelectorAll('.ea-sort-heatmap-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const table = document.getElementById('tabla-zona-main');
+                if (!table) return;
+                const tbody = table.querySelector('tbody');
+                if (!tbody) return;
+                const rows = Array.from(tbody.querySelectorAll('tr:not(.ea-tr-total)'));
+                const totalRow = tbody.querySelector('.ea-tr-total');
+                
+                const isActive = this.classList.toggle('active');
+                
+                if (isActive) {
+                    // Ordenar por data-dif-total (Defectos Totales DIF) descendente (de mayor a menor)
+                    rows.sort((a, b) => {
+                        const totalA = parseInt(a.getAttribute('data-dif-total')) || 0;
+                        const totalB = parseInt(b.getAttribute('data-dif-total')) || 0;
+                        return totalB - totalA;
+                    });
+                    
+                    rows.forEach(row => {
+                        tbody.appendChild(row);
+                    });
+                    
+                    if (totalRow) {
+                        tbody.appendChild(totalRow);
+                    }
+                    
+                    window.refreshHeatmap();
+                } else {
+                    // Restaurar orden original
+                    rows.sort((a, b) => {
+                        const idxA = parseInt(a.getAttribute('data-orig-index')) || 0;
+                        const idxB = parseInt(b.getAttribute('data-orig-index')) || 0;
+                        return idxA - idxB;
+                    });
+                    
+                    rows.forEach(row => {
+                        row.querySelectorAll('td').forEach(td => {
+                            if (td.getAttribute('data-cell-type') === 'dif' && td.hasAttribute('data-val')) {
+                                td.style.backgroundColor = '';
+                                td.style.removeProperty('background-color');
+                                td.style.color = '';
+                                td.style.removeProperty('color');
+                            }
+                        });
+                        tbody.appendChild(row);
+                    });
+                    
+                    if (totalRow) {
+                        tbody.appendChild(totalRow);
+                    }
+                }
+            });
+        });
     });
 
     function exportarCSV() {
@@ -1855,7 +2339,23 @@ if (isset($resultados['actual'])) {
         // Timeout de 35 segundos para no colgar el navegador
         const timeoutId = setTimeout(() => reincController.abort(), 35000);
 
-        const params = new URLSearchParams(window.location.search);
+        const params = new URLSearchParams();
+        params.set('m', '<?php echo $p1_mes; ?>');
+        params.set('a', '<?php echo $p1_anio; ?>');
+        params.set('comp', '<?php echo htmlspecialchars($tipo_comp); ?>');
+        params.set('zona', '<?php echo htmlspecialchars($filtro_zona); ?>');
+        <?php if ($icf_total): ?>
+        params.set('icf_total', '1');
+        <?php endif; ?>
+        
+        <?php foreach ($filtro_ciclo as $c): ?>
+        params.append('ciclo[]', '<?php echo htmlspecialchars($c); ?>');
+        <?php endforeach; ?>
+        
+        <?php foreach ($filtro_ciclo_cd as $c): ?>
+        params.append('ciclo_cd[]', '<?php echo htmlspecialchars($c); ?>');
+        <?php endforeach; ?>
+
         const url = 'get_reincidentes_zona.php?' + params.toString();
 
         // Poner loaders animados en todas las celdas reinc mientras carga
@@ -1887,10 +2387,31 @@ if (isset($resultados['actual'])) {
                     const titulo   = td.dataset.titulo;
                     const ciclo    = td.dataset.ciclo !== undefined ? td.dataset.ciclo : '';
 
-                    const val = (data[zona] && data[zona][agencia] && data[zona][agencia][anomalia])
-                                 ? parseInt(data[zona][agencia][anomalia]) : 0;
+                    let val = 0;
+                    if (zona !== '') {
+                        const targetZonaInt = parseInt(zona);
+                        let foundKey = null;
+                        for (const zKey in data) {
+                            if (parseInt(zKey) === targetZonaInt) {
+                                foundKey = zKey;
+                                break;
+                            }
+                        }
+                        val = (foundKey && data[foundKey][agencia] && data[foundKey][agencia][anomalia])
+                               ? parseInt(data[foundKey][agencia][anomalia]) : 0;
+                    } else {
+                        // Sumar para todas las zonas si no se seleccionó ninguna específica
+                        for (const zKey in data) {
+                            if (data[zKey] && data[zKey][agencia] && data[zKey][agencia][anomalia]) {
+                                val += parseInt(data[zKey][agencia][anomalia]) || 0;
+                            }
+                        }
+                    }
 
                     totalesPorAnomalia[anomalia] = (totalesPorAnomalia[anomalia] || 0) + val;
+
+                    td.setAttribute('data-val', val);
+                    td.setAttribute('data-raw', val);
 
                     const span = td.querySelector('.reinc-valor');
                     if (val > 0) {
@@ -1927,6 +2448,11 @@ if (isset($resultados['actual'])) {
                     const span     = td.querySelector('.reinc-total-valor');
                     if (span) { span.style.color = '#000'; span.textContent = total.toLocaleString(); }
                 });
+
+                // Refresh heatmap to color these newly loaded cells if active
+                if (typeof refreshHeatmap === 'function') {
+                    refreshHeatmap();
+                }
             })
             .catch(err => {
                 clearTimeout(timeoutId);
@@ -1949,7 +2475,35 @@ if (isset($resultados['actual'])) {
 
     // Cancelar el fetch en curso cuando el usuario aplica un nuevo filtro
     // (evita que el fetch anterior cuelgue la navegación)
-    document.querySelector('form[method="GET"]')?.addEventListener('submit', () => {
+    document.querySelector('form[method="GET"]')?.addEventListener('submit', function() {
+        // Sincronizar estado de ICF Total y ciclos antes de enviar
+        const chkIcf = document.getElementById('chk-icf-total');
+        if (chkIcf) {
+            let inputIcf = this.querySelector('input[name="icf_total"]');
+            if (chkIcf.checked) {
+                if (!inputIcf) {
+                    inputIcf = document.createElement('input');
+                    inputIcf.type = 'hidden';
+                    inputIcf.name = 'icf_total';
+                    inputIcf.value = '1';
+                    this.appendChild(inputIcf);
+                } else {
+                    inputIcf.value = '1';
+                }
+                // Desactivar temporalmente los inputs de ciclos para que no vayan en la URL
+                this.querySelectorAll('input[name="ciclo[]"], input[name="ciclo_cd[]"]').forEach(input => {
+                    input.disabled = true;
+                });
+            } else {
+                if (inputIcf) {
+                    inputIcf.remove();
+                }
+                this.querySelectorAll('input[name="ciclo[]"], input[name="ciclo_cd[]"]').forEach(input => {
+                    input.disabled = false;
+                });
+            }
+        }
+
         if (reincController) reincController.abort();
         // Mostrar overlay MD3 de carga al aplicar filtros
         const overlay = document.createElement('div');
@@ -1994,6 +2548,7 @@ if (isset($resultados['actual'])) {
         const chkIcf    = document.getElementById('chk-icf-total');
         const chkReinc  = document.getElementById('chk-extras-reinc');
         const chkEvol   = document.getElementById('chk-extras-evol');
+        const chkBloquear = document.getElementById('chk-extras-bloquear');
         const card      = document.getElementById('tabla-zona-card');
 
         if (!btnToggle || !dropdown) return;
@@ -2013,17 +2568,22 @@ if (isset($resultados['actual'])) {
             // Evolución + fix colspan del encabezado de grupo
             if (card) card.classList.toggle('extras-evol-visible', chkEvol.checked);
             
-            const evolColspan = chkEvol.checked ? 4 : 3;
-            // Ajustar colspan de los grupos de anomalías (cada uno incluye col evol)
-            document.querySelectorAll('[data-anom-group]:not(.reinc-col)').forEach(th => {
-                th.colSpan = evolColspan;
+            let anomColspan = 3;
+            if (chkEvol.checked) anomColspan += 1;
+            if (chkReinc.checked) anomColspan += 1;
+
+            // Ajustar colspan de los grupos de anomalías (cada uno incluye col evol y reinc si están activas)
+            document.querySelectorAll('[data-anom-group]').forEach(th => {
+                th.colSpan = anomColspan;
             });
             // Ajustar colspan del grupo DEFECTOS
             const defGrp = document.querySelector('.th-defecto-group');
-            if (defGrp) defGrp.colSpan = evolColspan;
+            let defColspan = 3;
+            if (chkEvol.checked) defColspan += 1;
+            if (defGrp) defGrp.colSpan = defColspan;
             
             // Badge del botón
-            const anyActive = chkIcf.checked || chkReinc.checked || chkEvol.checked;
+            const anyActive = (chkIcf ? chkIcf.checked : false) || chkReinc.checked || chkEvol.checked || (chkBloquear ? chkBloquear.checked : false);
             btnToggle.classList.toggle('active', anyActive);
 
             // Bloquear filtros si ICF Total está activo
@@ -2043,20 +2603,59 @@ if (isset($resultados['actual'])) {
 
         if (chkIcf) {
             chkIcf.addEventListener('change', function() {
-                const params = new URLSearchParams(window.location.search);
-                if (this.checked) {
-                    params.set('icf_total', '1');
-                    // Al activar ICF Total, eliminamos los ciclos de la URL para que sea un total real
-                    params.delete('ciclo');
-                } else {
-                    params.delete('icf_total');
+                const form = document.querySelector('form[method="GET"]');
+                if (form) {
+                    if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        // Fallback para navegadores antiguos que no soportan requestSubmit()
+                        let inputIcf = form.querySelector('input[name="icf_total"]');
+                        if (this.checked) {
+                            if (!inputIcf) {
+                                inputIcf = document.createElement('input');
+                                inputIcf.type = 'hidden';
+                                inputIcf.name = 'icf_total';
+                                inputIcf.value = '1';
+                                form.appendChild(inputIcf);
+                            } else {
+                                inputIcf.value = '1';
+                            }
+                            form.querySelectorAll('input[name="ciclo[]"], input[name="ciclo_cd[]"]').forEach(input => {
+                                input.disabled = true;
+                            });
+                        } else {
+                            if (inputIcf) {
+                                inputIcf.remove();
+                            }
+                            form.querySelectorAll('input[name="ciclo[]"], input[name="ciclo_cd[]"]').forEach(input => {
+                                input.disabled = false;
+                            });
+                        }
+
+                        if (typeof reincController !== 'undefined' && reincController) {
+                            reincController.abort();
+                        }
+                        const overlay = document.createElement('div');
+                        overlay.className = 'ea-page-overlay';
+                        overlay.innerHTML = `
+                            <div class="ea-page-overlay__card">
+                                <div class="ea-spinner ea-spinner--lg"></div>
+                                <span class="ea-spinner-text">Aplicando filtros…</span>
+                                <span class="ea-spinner-subtext">Recalculando datos del periodo</span>
+                            </div>
+                        `;
+                        document.body.appendChild(overlay);
+                        form.submit();
+                    }
                 }
-                window.location.href = '?' + params.toString();
             });
         }
 
         chkReinc.addEventListener('change', applyExtras);
         chkEvol.addEventListener('change', applyExtras);
+        if (chkBloquear) {
+            chkBloquear.addEventListener('change', applyExtras);
+        }
 
         applyExtras();
     })();
@@ -2071,6 +2670,7 @@ if (isset($resultados['actual'])) {
         const chkCdTodos = document.getElementById('chk-cd-todos');
         const badge      = document.getElementById('anom-desel-badge');
         const cdExtraRow = document.getElementById('anom-cd-extra-row');
+        const chkBloquear = document.getElementById('chk-extras-bloquear');
 
         if (!btnToggle || !dropdown) return;
 
@@ -2150,9 +2750,12 @@ if (isset($resultados['actual'])) {
             table.querySelectorAll('tbody tr').forEach(row => {
                 let sumAct = 0, sumBim = 0;
 
-                // Sumar solo las celdas de anomalías activas
+                // Sumar anomalías según modo:
+                // - Bloquear activo  → sumar TODAS (incluyendo ocultas) para que el total no cambie
+                // - Bloquear inactivo → sumar solo las visibles/activas
+                const sumarTodas = chkBloquear && chkBloquear.checked;
                 anomOrder.forEach(anom => {
-                    if (!activeAnoms.has(anom)) return;
+                    if (!sumarTodas && !activeAnoms.has(anom)) return;
                     const cellAct = row.querySelector(`[data-anom-cell="${anom}"][data-cell-type="actual"]`);
                     const cellBim = row.querySelector(`[data-anom-cell="${anom}"][data-cell-type="bimestre"]`);
                     if (cellAct) sumAct += parseInt(cellAct.dataset.raw || cellAct.textContent.replace(/[^\d]/g, '')) || 0;
@@ -2161,13 +2764,15 @@ if (isset($resultados['actual'])) {
 
                 const dif = sumAct - sumBim;
                 let evolVal = null;
-                if (sumBim !== 0) {
+                if (sumBim === 0) {
+                    evolVal = (sumAct === 0) ? 0.0 : 100.0;
+                } else {
                     evolVal = (dif / sumBim) * 100;
-                    if (Math.abs(evolVal) > 0.01) {
-                        const absEvol = Math.abs(evolVal);
-                        if (absEvol > maxEvol) {
-                            maxEvol = absEvol;
-                        }
+                }
+                if (evolVal !== null && Math.abs(evolVal) > 0.01) {
+                    const absEvol = Math.abs(evolVal);
+                    if (absEvol > maxEvol) {
+                        maxEvol = absEvol;
                     }
                 }
 
@@ -2197,6 +2802,9 @@ if (isset($resultados['actual'])) {
                 if (defActCell) defActCell.textContent = sumAct.toLocaleString();
                 if (defBimCell) defBimCell.textContent = sumBim.toLocaleString();
                 if (defDifCell) {
+                    // Actualizar data-val y data-raw para que refreshHeatmap lea el valor recalculado
+                    defDifCell.setAttribute('data-val', dif);
+                    defDifCell.setAttribute('data-raw', dif);
                     const difContent = defDifCell.querySelector('.dif-content');
                     if (difContent) {
                         if (dif > 0) {
@@ -2223,38 +2831,25 @@ if (isset($resultados['actual'])) {
                 }
 
                 if (defEvolCell) {
-                    let evolText = '—', bg = '#fff', fg = '#1e2b27';
+                    let evolText = '—', bg = '#FFF9D0', fg = '#000000';
                     if (evolVal !== null) {
                         evolText = (evolVal > 0 ? '+' : '') + evolVal.toFixed(1) + '%';
                         const a = Math.abs(evolVal);
 
                         if (a < 0.01) {
-                            bg = '#fff'; fg = '#1e2b27';
+                            bg = '#FFF9D0'; fg = '#000000';
                         } else if (maxEvol > 0) {
                             const ratio = a / maxEvol;
                             if (evolVal > 0) {
-                                // Positivos (Incremento de Anomalías) - Escala de amarillo a rojo
-                                if (ratio <= 0.10) bg = '#FFFFDF';
-                                else if (ratio <= 0.20) bg = '#FFFFB8';
-                                else if (ratio <= 0.30) bg = '#FFFF94';
-                                else if (ratio <= 0.40) bg = '#FDF190';
-                                else if (ratio <= 0.50) bg = '#FCEB93';
-                                else if (ratio <= 0.60) bg = '#F9D08D';
-                                else if (ratio <= 0.70) bg = '#EBCA8F';
-                                else if (ratio <= 0.80) bg = '#F1AA87';
-                                else if (ratio <= 0.90) bg = '#F08B82';
-                                else { bg = '#E57373'; fg = '#1e2b27'; }
+                                // Positivos
+                                if (ratio <= 0.50) { bg = '#FFE082'; fg = '#000000'; }
+                                else if (ratio <= 0.80) { bg = '#FFB74D'; fg = '#000000'; }
+                                else { bg = '#FF5555'; fg = '#000000'; }
                             } else {
-                                // Negativos (Reducción de Anomalías) - Escala verde
-                                if (ratio <= 0.10) bg = '#F4FBF5';
-                                else if (ratio <= 0.20) bg = '#E8F5E9';
-                                else if (ratio <= 0.30) bg = '#D8EED9';
-                                else if (ratio <= 0.40) bg = '#C8E6C9';
-                                else if (ratio <= 0.50) bg = '#B8DEC0';
-                                else if (ratio <= 0.60) bg = '#A5D6A7';
-                                else if (ratio <= 0.70) bg = '#96CE9D';
-                                else if (ratio <= 0.80) bg = '#89C791';
-                                else { bg = '#81C784'; fg = '#1e2b27'; }
+                                // Negativos
+                                if (ratio <= 0.80) { bg = '#C8E6C9'; fg = '#000000'; }
+                                else if (ratio <= 0.95) { bg = '#66BB6A'; fg = '#000000'; }
+                                else { bg = '#2E7D32'; fg = '#ffffff'; }
                             }
                         }
                     }
@@ -2264,6 +2859,11 @@ if (isset($resultados['actual'])) {
                     defEvolCell.textContent = evolText;
                 }
             });
+
+            // Actualizar mapa de calor con los valores DIF recién recalculados
+            if (typeof window.refreshHeatmap === 'function') {
+                window.refreshHeatmap();
+            }
         }
 
         // Toggle dropdown
@@ -2322,6 +2922,12 @@ if (isset($resultados['actual'])) {
                     }
                 }
                 window.location.href = '?' + params.toString();
+            });
+        }
+
+        if (chkBloquear) {
+            chkBloquear.addEventListener('change', function() {
+                updateColumnVisibility();
             });
         }
 
@@ -2518,11 +3124,16 @@ async function exportarExcelZona() {
     }
 
     const difCols = new Set();
+    const evolCols = new Set();
+    const reincCols = new Set();
+    const maxCharsByCol = {};
+    let maxColWritten = 0;
 
     allTrs.forEach(tr => {
 
         let col=1;
         const isTotal = tr.classList.contains('ea-tr-total');
+        const isTbodyRow = tr.parentElement && tr.parentElement.tagName.toLowerCase() === 'tbody';
         tr.querySelectorAll('th, td').forEach(cell => {
             if(!isVis(cell)) return;
             while(isO(exR,col)) col++;
@@ -2534,6 +3145,7 @@ async function exportarExcelZona() {
             if (cs >= 50 && totalColSpan > 0) {
                 cs = totalColSpan;
             }
+            maxColWritten = Math.max(maxColWritten, col + cs - 1);
 
 
             // ── Estilo y Valor ──
@@ -2542,10 +3154,20 @@ async function exportarExcelZona() {
             let fc = rgbA(comp.color) || 'FF000000';
             let bold = comp.fontWeight === 'bold' || parseInt(comp.fontWeight) >= 600;
             let sz = 9;
-            if (cell.classList.contains('ea-table__head-main')) { sz = 12; }
+            if (cell.classList.contains('ea-table__head-main')) {
+                sz = 12;
+            } else if (exR === 2 || exR === 3) {
+                sz = 8; // Cabeceras de nombres de anomalías y de meses pasan a Arial 8
+            }
 
             let val;
             const isDif = cell.classList.contains('td-dif');
+            if (cell.classList.contains('evol-col')) {
+                for (let i = 0; i < cs; i++) { evolCols.add(col + i); }
+            }
+            if (cell.classList.contains('reinc-col')) {
+                for (let i = 0; i < cs; i++) { reincCols.add(col + i); }
+            }
             if (isDif) {
                 for (let i = 0; i < cs; i++) {
                     difCols.add(col + i);
@@ -2558,20 +3180,27 @@ async function exportarExcelZona() {
                     let icon, ic;
                     if (nv > 0) { icon = '▼'; ic = 'FFC00000'; }
                     else if (nv < 0) { icon = '▲'; ic = 'FF548235'; }
-                    else { icon = '='; ic = 'FFFFB347'; }
+                    else { icon = '═'; ic = 'FFFFB347'; }
                     
                     // Si es la fila de total general, el texto suele ser blanco sobre fondo oscuro
                     let textCol = fc; 
+                    if (bg === 'FF104861') {
+                        textCol = 'FFFFFFFF'; // Asegurar texto blanco en el total de Defectos Totales (fondo oscuro)
+                    } 
                     
-                    // Calcular el padding para alinear icon a la izquierda y número a la derecha
-                    const padCount = Math.max(1, 5 - nt.length);
-                    const padding = ' '.repeat(padCount);
+                    // Evitar incluir elementos vacíos en richText para prevenir corrupción del archivo (sharedStrings.xml)
+                    const runs = [];
+                    // Si es cero, agregar un espacio antes de la cabecera (" ═ 0") para alinear
+                    if (nv === 0) {
+                        runs.push({ text: ' ', font: { name: 'Arial', size: 9 } });
+                    }
+                    runs.push({ text: icon, font: { color: { argb: ic }, bold: true, size: 9.5, name: 'Arial' } });
+                    if (!nt.startsWith('-')) {
+                        runs.push({ text: ' ', font: { name: 'Arial', size: 9 } });
+                    }
+                    runs.push({ text: nt, font: { color: { argb: textCol }, bold: bold, size: 9, name: 'Arial' } });
                     
-                    val = { richText: [
-                        { text: icon, font: { color: { argb: ic }, bold: true, size: 12, name: 'Arial' } },
-                        { text: padding, font: { name: 'Consolas', size: 9 } },
-                        { text: nt, font: { color: { argb: textCol }, bold: bold, size: 9, name: 'Consolas' } }
-                    ] };
+                    val = { richText: runs };
                 } else { val = cell.textContent.trim(); }
             } else {
                 let t = cell.textContent.trim();
@@ -2607,6 +3236,27 @@ async function exportarExcelZona() {
             if (bg) ec.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
             ec.font = { name: 'Arial', size: sz, bold: bold, color: { argb: fc } };
 
+            // Track maximum characters for auto-sizing columns in data rows
+            if (isTbodyRow) {
+                let textForLen = '';
+                if (isDif) {
+                    const dc = cell.querySelector('.dif-content');
+                    if (dc) {
+                        const sp = dc.querySelector('span');
+                        textForLen = sp ? sp.textContent.trim() : '0';
+                    }
+                } else {
+                    textForLen = cell.textContent.trim();
+                }
+                const len = textForLen.length;
+                for (let i = 0; i < cs; i++) {
+                    const currentCol = col + i;
+                    if (!maxCharsByCol[currentCol] || len > maxCharsByCol[currentCol]) {
+                        maxCharsByCol[currentCol] = len;
+                    }
+                }
+            }
+
             // Merge
             if (cs > 1 || rs > 1) {
                 ws.mergeCells(exR, col, exR + rs - 1, col + cs - 1);
@@ -2629,18 +3279,54 @@ async function exportarExcelZona() {
     });
 
     // ── Anchos de columna ──
-    const maxC = ws.columnCount;
-    for(let c=1;c<=maxC;c++){
+    for(let c=1;c<=maxColWritten;c++){
         if (c === 1) {
-            ws.getColumn(c).width = 12;
-        } else if (difCols.has(c)) {
-            ws.getColumn(c).width = 9;
+            ws.getColumn(c).width = 10.5; // Ajustado exactamente para que coincida con el AutoFit manual de Excel (94px)
+        } else if (c === 2 || c === 3 || c === 4) {
+            // Cancelaciones: asegurar espacio suficiente para la cabecera principal "CANCELACIONES"
+            const maxValLen = maxCharsByCol[c] || 1;
+            if (c === 4) {
+                ws.getColumn(c).width = Math.max(5.3, maxValLen + 1.2); // DIF: sin cambios
+            } else {
+                ws.getColumn(c).width = Math.max(4.4, maxValLen + 0.2); // Reducido 3px
+            }
         } else {
-            ws.getColumn(c).width = 7;
+            const maxValLen = maxCharsByCol[c] || 1;
+            if (difCols.has(c)) {
+                // Columnas DIF: min 5.5 para evitar cortes (como el total de defectos ▲-718), maxValLen + 1.8 para espaciado súper compacto
+                ws.getColumn(c).width = Math.max(5.5, maxValLen + 1.8);
+            } else if (evolCols.has(c) || reincCols.has(c)) {
+                // Columnas % Evol y REINC.: min 6.1, maxValLen + 0.2 (Reducido 3px)
+                ws.getColumn(c).width = Math.max(6.1, maxValLen + 0.2);
+            } else {
+                // Columnas normales (ABR/FEB): min 3.8, maxValLen + 0.2 (Reducido 3px)
+                ws.getColumn(c).width = Math.max(3.8, maxValLen + 0.2);
+            }
         }
     }
-    // Altura de filas de datos compacta
-    ws.eachRow((row,idx)=>{ if(idx>2) row.height=16; });
+    // Calcular el alto de las filas dinámicamente para las filas con números (idx > 3) para evitar recortes
+    // y dejar las cabeceras (idx <= 3) para que Excel aplique su AutoFit de forma nativa
+    ws.eachRow((row, idx) => {
+        if (idx > 3) {
+            let maxFS = 9;
+            row.eachCell({ includeEmpty: false }, cell => {
+                if (cell.font && cell.font.size && cell.font.size > maxFS) {
+                    maxFS = cell.font.size;
+                }
+                if (cell.value && cell.value.richText) {
+                    cell.value.richText.forEach(rt => {
+                        if (rt.font && rt.font.size && rt.font.size > maxFS) {
+                            maxFS = rt.font.size;
+                        }
+                    });
+                }
+            });
+            // Multiplicador 1.3 más margen de 5.5pt para bordes y alineación vertical media
+            row.height = maxFS * 1.3 + 5.5;
+        } else {
+            row.height = undefined;
+        }
+    });
 
     // ── Descargar ──
     const buf = await wb.xlsx.writeBuffer();

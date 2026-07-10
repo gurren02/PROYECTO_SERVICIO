@@ -81,6 +81,7 @@ if ($is_cli) {
     <html lang="es">
     <head>
         <meta charset="UTF-8">
+        <link rel="icon" type="image/png" href="assets/multimedia/icon_bluebg.png">
         <title>Actualización de Base de Datos</title>
         <style>
             body {

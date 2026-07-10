@@ -65,6 +65,21 @@ function formatearRangoCiclos($arr) {
     return implode(" Y ", $partes);
 }
 
+function obtenerTextoRangoFiltro($ciclos_completo, $filtro_ciclo) {
+    if (empty($filtro_ciclo)) {
+        $seleccionados = $ciclos_completo;
+    } else {
+        $seleccionados = array_intersect($ciclos_completo, array_map('intval', $filtro_ciclo));
+    }
+    if (empty($seleccionados)) {
+        return "Ninguno";
+    } elseif (count($seleccionados) === 1) {
+        return (string)reset($seleccionados);
+    } else {
+        return min($seleccionados) . " AL " . max($seleccionados);
+    }
+}
+
 $p1_mes  = isset($_GET['m']) ? (int)$_GET['m'] : (int)date('n');
 $p1_anio = isset($_GET['a']) ? (int)$_GET['a'] : (int)date('Y');
 
@@ -117,11 +132,10 @@ if (isset($_GET['filtrado_aplicado'])) {
         unset($_SESSION['filtro_ciclo']);
     }
 } else {
-    if (isset($_GET['ciclo'])) {
-        $_SESSION['filtro_ciclo'] = $_GET['ciclo'];
-    } elseif (isset($_SESSION['filtro_ciclo'])) {
-        $_GET['ciclo'] = $_SESSION['filtro_ciclo'];
-    }
+    // Al pasar a este reporte desde la zona/agencia (o carga inicial sin enviar el formulario de filtros),
+    // ignoramos cualquier ciclo previamente guardado en sesión o pasado por URL para usar la selección por defecto.
+    unset($_SESSION['filtro_ciclo']);
+    unset($_GET['ciclo']);
 }
 
 $filtro_zona  = isset($_GET['zona']) ? trim($_GET['zona']) : '';
@@ -131,6 +145,34 @@ if (isset($_GET['ciclo'])) {
         $filtro_ciclo = $_GET['ciclo'];
     } else {
         $filtro_ciclo = array_filter(explode(',', (string)$_GET['ciclo']), 'strlen');
+    }
+}
+
+// Si el filtro de ciclo fue heredado del reporte de nivel zona/agencia (sin envío explícito de este formulario)
+// y contiene únicamente los ciclos bimestrales que coinciden con la paridad del mes, lo descartamos
+// para que en este reporte (Desglose Estimaciones) se muestren todos los ciclos por defecto.
+if (!isset($_GET['filtrado_aplicado']) && !empty($filtro_ciclo)) {
+    $filter_bimestrales = [];
+    foreach ($filtro_ciclo as $c) {
+        $c_val = (int)$c;
+        if ($c_val >= 1 && $c_val <= 61) {
+            $filter_bimestrales[] = $c_val;
+        }
+    }
+    if (count($filter_bimestrales) > 1) {
+        $only_matching_parity = true;
+        foreach ($filter_bimestrales as $c_val) {
+            $matches = ($p1_mes % 2 === 0 && $c_val % 2 === 0) || ($p1_mes % 2 !== 0 && $c_val % 2 !== 0);
+            if (!$matches) {
+                $only_matching_parity = false;
+                break;
+            }
+        }
+        if ($only_matching_parity) {
+            $filtro_ciclo = [];
+            unset($_SESSION['filtro_ciclo']);
+            unset($_GET['ciclo']);
+        }
     }
 }
 
@@ -174,17 +216,13 @@ $ciclos_bimestrales = [];
 $ciclos_mensuales = [];
 foreach ($ciclos_disponibles as $c) {
     if ($c >= 1 && $c <= 61) {
-        if ($is_even_month && $c % 2 === 0) {
-            $ciclos_bimestrales[] = $c;
-        } elseif (!$is_even_month && $c % 2 !== 0) {
-            $ciclos_bimestrales[] = $c;
-        }
-    } elseif ($c >= 62 && $c <= 80) {
+        $ciclos_bimestrales[] = $c;
+    } elseif ($c >= 62 && $c <= 84) {
         $ciclos_mensuales[] = $c;
     }
 }
 
-// Preselección de todos los ciclos que tengan valores en el mes actual (solo bimestrales por defecto)
+// Preselección de todos los ciclos por defecto (tanto bimestrales como mensuales)
 // Solo se ejecuta en primera carga (cuando no hay filtros aplicados, ni en sesión, ni por submit del formulario)
 $es_primera_carga = !isset($_GET['ciclo']) && !isset($_SESSION['filtro_ciclo']) && !isset($_GET['clear_filters']) && !isset($_GET['filtrado_aplicado']);
 if ($period_changed) {
@@ -192,10 +230,9 @@ if ($period_changed) {
 }
 
 if ($es_primera_carga && empty($filtro_ciclo)) {
-    foreach ($ciclos_bimestrales as $c) {
-        if (in_array($c, $ciclos_actuales)) {
-            $filtro_ciclo[] = (string)$c;
-        }
+    // Por defecto se seleccionan todos los ciclos disponibles (tanto bimestrales como mensuales)
+    foreach ($ciclos_disponibles as $c) {
+        $filtro_ciclo[] = (string)$c;
     }
 }
 
@@ -205,13 +242,14 @@ $totales_columnas = [];
 
 
 try {
-    $where_sql = "WHERE 1=1 AND Motivo_Estimacion != '' AND Motivo_Estimacion IS NOT NULL";
+    $where_sql = "WHERE 1=1";
     $parametros_sql = [];
 
     if ($filtro_zona !== '')  {
         $where_sql .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
         $parametros_sql[] = (int)$filtro_zona;
     }
+    $where_sql .= " AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))";
     if (!empty($filtro_ciclo)) {
         $placeholders = [];
         foreach ($filtro_ciclo as $c) {
@@ -232,7 +270,10 @@ try {
     $total_registros_analisis = 0;
     while ($fila = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $letra_bd = $fila['letra_bd'];
-        $mot = $fila['motivo'];
+        $mot = isset($fila['motivo']) ? trim($fila['motivo']) : '';
+        if ($mot === '') {
+            $mot = 'PENDIENTE ACTUALIZAR';
+        }
         $total = (int)$fila['total'];
         
         $total_registros_analisis += $total;
@@ -299,12 +340,31 @@ foreach ($totales_columnas as $ag => $total) {
     }
 }
 
+$estimaciones_defecto = $motivos_final;
+
+// 4. Calcular métricas iniciales considerando solo las estimaciones por defecto
+$totales_columnas_inicial = array_fill_keys($agencias_display, 0);
+$totales_fila_inicial = array_fill_keys($motivos_final, 0);
+$total_registros_analisis_inicial = 0;
 $max_valor = 0;
+
 foreach ($datos as $mot => $ags) {
-    foreach ($ags as $ag => $val) {
-        if ($val > $max_valor) $max_valor = $val;
+    if (in_array($mot, $estimaciones_defecto)) {
+        foreach ($ags as $ag => $val) {
+            if ($val > 0) {
+                if (in_array($ag, $agencias_display)) {
+                    $totales_columnas_inicial[$ag] += $val;
+                    $totales_fila_inicial[$mot] += $val;
+                    $total_registros_analisis_inicial += $val;
+                    if ($val > $max_valor) {
+                        $max_valor = $val;
+                    }
+                }
+            }
+        }
     }
 }
+
 $max_fila_total = !empty($totales_fila) ? max($totales_fila) : 0;
 
 
@@ -352,6 +412,7 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
     <title>Detalle Estimaciones</title>
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/header.css">
@@ -360,22 +421,23 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
     <link rel="stylesheet" href="../assets/ejecutar_analisis.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <style>
-        /* ── Estilos específicos del heatmap de estimaciones ── */
         .heatmap-table { border-collapse: collapse; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; width: fit-content; margin: 0; }
-        .heatmap-table th, .heatmap-table td { border: 1px solid #000; padding: 5px 6px; font-size: 16px; }
-        .heatmap-table th { background-color: #C1E5F3; color: #000; font-weight: 700; text-align: center; font-size: 14px; }
-        .heatmap-table th.col-motivo { text-align: center; padding: 4px 6px; font-size: 13px; vertical-align: middle; }
+        .heatmap-table th, .heatmap-table td { border: 1px solid #000; padding: 1px 1.5px !important; line-height: 1.1 !important; vertical-align: middle !important; }
+        .heatmap-table th { background-color: #C1E5F3; color: #000; font-weight: 700; text-align: center; font-size: 15px !important; }
+        .heatmap-table th.col-motivo { text-align: center; padding: 1px 2px !important; font-size: 15px !important; vertical-align: middle; }
         .col-motivo-wrapper { display: flex; align-items: center; justify-content: center; width: 100%; }
-        .heatmap-table td { text-align: center; color: #000 !important; font-weight: 600; }
-        .heatmap-table td.row-label { text-align: center; background-color: #fff; font-weight: 600; padding: 4px 6px; font-size: 13px; white-space: nowrap; }
+        .heatmap-table td { text-align: center; color: #000 !important; font-weight: 400; font-size: 18px !important; }
+        .heatmap-table td .cell-value { opacity: 0.95S; font-weight: 400; }
+        .heatmap-table td.row-label { text-align: center; background-color: #fff; font-weight: 600; padding: 1px 2px !important; font-size: 15px !important; white-space: nowrap; }
         .heatmap-table td.row-total { font-weight: bold; color: #000; }
-        .heatmap-table td.col-total { background-color: #C1E5F3; font-weight: bold; color: #000; padding: 5px 6px; width: max-content; }
+        .heatmap-table td.col-total { background-color: #C1E5F3; font-weight: bold; color: #000; padding: 1px 2px !important; width: max-content; }
         /* Clase para celdas de agencia con valor pequeño */
-        .heatmap-table td.col-narrow { padding: 5px 4px !important; min-width: 28px; max-width: 40px; }
-        .heatmap-table th.col-narrow-th { padding: 5px 4px !important; min-width: 28px; max-width: 40px; }
+        .heatmap-table td.col-narrow { padding: 1px 1px !important; min-width: 24px; max-width: 40px; }
+        .heatmap-table th.col-narrow-th { padding: 1px 1px !important; min-width: 24px; max-width: 40px; }
         .sort-btn { background: none; border: none; cursor: pointer; color: #fff; border-radius: 4px; display: inline-flex; align-items: center; padding: 2px; }
         .sort-btn:hover { background: rgba(255,255,255,0.2); }
-        .ea-table-card { width: fit-content; max-width: 100%; }
+        .ea-table-card { width: fit-content; max-width: 100%; overflow: visible !important; }
+        .ea-table-wrapper { overflow-x: auto !important; overflow-y: hidden !important; }
 
         /* --- Estilos para los Filtros (Portados de reportes de zona) --- */
         .ea-filters-card { margin-bottom: 20px; }
@@ -392,6 +454,51 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
         .ea-tag {
             display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 20px; 
             font-size: 0.75rem; font-weight: 600; background: #f1f3f5; color: #495057; border: 1px solid #dee2e6;
+        }
+
+        /* Botón y dropdown de Estimaciones */
+        .btn-anom-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        .btn-anom-toggle {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 8px 14px; border-radius: 6px; border: 1px solid #a3d9a5;
+            background: #d4edda; color: #2d6a4f; font-size: 0.88rem; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+            height: 38px;
+            box-sizing: border-box;
+        }
+        .btn-anom-toggle:hover { background: #c1e6c9; border-color: #82c785; }
+        .btn-anom-toggle.active { background: #56ab5e; color: #fff; border-color: #56ab5e; }
+        .anom-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            min-width: 280px;
+            max-height: 420px;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            z-index: 50;
+            margin-top: 5px;
+        }
+        .anom-dropdown-menu.open { display: block; }
+        .anom-dropdown-menu label {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 0.85rem; cursor: pointer;
+            padding: 5px 8px; border-radius: 4px; transition: background 0.15s;
+            text-align: left;
+            font-weight: 500;
+            color: #333;
+        }
+        .anom-dropdown-menu label:hover { background: #f1f3f5; }
+        .anom-dropdown-menu .anom-select-all {
+            background: #f8f9fa; margin-bottom: 4px; font-weight: 600;
         }
 
         /* ── Estilos para Impresión ── */
@@ -446,7 +553,7 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
             </a>
             <div>
                 <h1 class="ea-page-title">Cuenta de Agencia — Desglose Estimaciones</h1>
-                <p class="ea-page-subtitle"><?php echo $titulo_mes; ?></p>
+                <p class="ea-page-subtitle"><span style="color: #2E7D32; font-weight: bold;"><?php echo $titulo_mes; ?></span></p>
             </div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -461,6 +568,10 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
             <a href="ejecutar_analisis.php?m=<?php echo $p1_mes; ?>&a=<?php echo $p1_anio; ?>" class="ea-btn-switch-report" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; background-color: #d6eaf8; color: #1b4f72; border: 1px solid #aed6f1; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: background 0.18s, transform 0.1s;" onmouseover="this.style.backgroundColor='#aed6f1'" onmouseout="this.style.backgroundColor='#d6eaf8'">
                 <span class="material-symbols-rounded" style="font-size: 18px;">business</span>
                 Ir a Nivel Agencia
+            </a>
+            <a href="comparacion.php?mes_objetivo=<?php echo $p1_mes; ?>&anio_objetivo=<?php echo $p1_anio; ?><?php echo ($filtro_zona !== '') ? '&zona=' . urlencode($filtro_zona) : ''; ?>" class="ea-btn-switch-report" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; background-color: #f4fadc; color: #515d07; border: 1px solid #e4f2b1; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: background 0.18s, transform 0.1s;" onmouseover="this.style.backgroundColor='#e4f2b1'" onmouseout="this.style.backgroundColor='#f4fadc'">
+                <span class="material-symbols-rounded" style="font-size: 18px;">compare_arrows</span>
+                Ir a Comparación
             </a>
         </div>
     </div>
@@ -494,7 +605,7 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
                     <span class="material-symbols-rounded">analytics</span>
                     <div>
                         <span class="ea-info-label">Registros totales</span>
-                        <span class="ea-info-value"><?php echo number_format($total_registros_analisis); ?></span>
+                        <span class="ea-info-value" id="registros-totales-value"><?php echo number_format($total_registros_analisis_inicial); ?></span>
                     </div>
                 </div>
             </div>
@@ -531,7 +642,7 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
                     </label>
                     <div class="ea-dropdown-checkboxes" style="position: relative;">
                         <div class="ea-form__control ea-dropdown-toggle" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-width: 140px; background: #fff;">
-                            <span class="ea-dropdown-text">TODOS</span>
+                            <span class="ea-dropdown-text"><?php echo htmlspecialchars(obtenerTextoRangoFiltro($ciclos_bimestrales, $filtro_ciclo)); ?></span>
                             <span class="material-symbols-rounded" style="font-size: 1.2rem; pointer-events: none;">arrow_drop_down</span>
                         </div>
                         <div class="ea-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 400px; overflow-y: auto; background: #fff; border: 1px solid #ced4da; border-radius: 4px; padding: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10; margin-top: 5px;">
@@ -548,7 +659,7 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
                                 $lbl_style = $is_missing ? 'color: #d32f2f; font-weight: bold;' : '';
                             ?>
                                 <label style="display: block; font-size: 0.85rem; cursor: pointer; padding: 5px; <?php echo $lbl_style; ?>" class="lbl-ciclo">
-                                    <input type="checkbox" class="chk-ciclo" name="ciclo[]" value="<?php echo $c; ?>" <?php echo in_array((string)$c, $filtro_ciclo) ? 'checked' : ''; ?> /> 
+                                    <input type="checkbox" class="chk-ciclo" name="ciclo[]" value="<?php echo $c; ?>" <?php echo (empty($filtro_ciclo) || in_array((string)$c, $filtro_ciclo)) ? 'checked' : ''; ?> /> 
                                     <?php echo $c; ?>
                                 </label>
                             <?php endforeach; ?>
@@ -559,11 +670,11 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
                 <div class="ea-form__group">
                     <label class="ea-form__label">
                         <span class="material-symbols-rounded">update</span>
-                        Ciclos Mens. (62-80)
+                        Ciclos Mens. (62-84)
                     </label>
                     <div class="ea-dropdown-checkboxes" style="position: relative;">
                         <div class="ea-form__control ea-dropdown-toggle" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-width: 140px; background: #fff;">
-                            <span class="ea-dropdown-text">TODOS</span>
+                            <span class="ea-dropdown-text"><?php echo htmlspecialchars(obtenerTextoRangoFiltro($ciclos_mensuales, $filtro_ciclo)); ?></span>
                             <span class="material-symbols-rounded" style="font-size: 1.2rem; pointer-events: none;">arrow_drop_down</span>
                         </div>
                         <div class="ea-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 400px; overflow-y: auto; background: #fff; border: 1px solid #ced4da; border-radius: 4px; padding: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10; margin-top: 5px;">
@@ -580,7 +691,7 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
                                 $lbl_style = $is_missing ? 'color: #d32f2f; font-weight: bold;' : '';
                             ?>
                                 <label style="display: block; font-size: 0.85rem; cursor: pointer; padding: 5px; <?php echo $lbl_style; ?>" class="lbl-ciclo">
-                                    <input type="checkbox" class="chk-ciclo" name="ciclo[]" value="<?php echo $c; ?>" <?php echo in_array((string)$c, $filtro_ciclo) ? 'checked' : ''; ?> /> 
+                                    <input type="checkbox" class="chk-ciclo" name="ciclo[]" value="<?php echo $c; ?>" <?php echo (empty($filtro_ciclo) || in_array((string)$c, $filtro_ciclo)) ? 'checked' : ''; ?> /> 
                                     <?php echo $c; ?>
                                 </label>
                             <?php endforeach; ?>
@@ -595,6 +706,33 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
                     <?php if($filtro_zona !== '' || !empty($filtro_ciclo)): ?>
                         <a href="?m=<?php echo $p1_mes; ?>&a=<?php echo $p1_anio; ?>&origen=<?php echo $origen; ?>&clear_filters=1" class="ea-btn ea-btn--danger">Limpiar</a>
                     <?php endif; ?>
+                </div>
+
+                <div style="display: flex; align-items: flex-end; margin-left: auto; gap: 8px;">
+                    <div class="btn-anom-wrapper" id="estim-wrapper">
+                        <button type="button" class="btn-anom-toggle active" id="btn-estim-toggle">
+                            <span class="material-symbols-rounded" style="font-size: 17px;">electric_bolt</span>
+                            Estimaciones
+                            <span id="estim-desel-badge" style="display:none; background: rgba(255,255,255,0.35); padding: 1px 6px; border-radius: 10px; font-size: 0.75rem; margin-left: 2px;"></span>
+                        </button>
+                        <div class="anom-dropdown-menu" id="estim-dropdown">
+                            <label class="anom-select-all">
+                                <input type="checkbox" id="estim-select-all" checked /> <strong>(Seleccionar todo)</strong>
+                            </label>
+                            <hr style="margin: 4px 0; border-color: #eee;">
+                            <?php
+                            $todos_motivos_dropdown = array_unique(array_merge($estimaciones_defecto, $motivos_final));
+                            sort($todos_motivos_dropdown);
+                            foreach ($todos_motivos_dropdown as $mot_key):
+                                $is_chk = in_array($mot_key, $estimaciones_defecto);
+                            ?>
+                                <label style="display: block; font-size: 0.85rem; cursor: pointer; padding: 5px;">
+                                    <input type="checkbox" class="chk-estim" name="estim_sel[]" value="<?php echo htmlspecialchars($mot_key); ?>" <?php echo $is_chk ? 'checked' : ''; ?> /> 
+                                    <?php echo htmlspecialchars($mot_key); ?>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
@@ -628,9 +766,11 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
                     foreach ($agencias_display as $ag) {
                         $vals = [];
                         foreach ($motivos_final as $motivo) {
-                            $val = $datos[$motivo][$ag] ?? 0;
-                            if ($val > 0) {
-                                $vals[] = $val;
+                            if (in_array($motivo, $estimaciones_defecto)) {
+                                $val = $datos[$motivo][$ag] ?? 0;
+                                if ($val > 0) {
+                                    $vals[] = $val;
+                                }
                             }
                         }
                         $max_columnas[$ag] = empty($vals) ? 0 : max($vals);
@@ -638,9 +778,11 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
 
                     $vals_total = [];
                     foreach ($motivos_final as $motivo) {
-                        $val = $totales_fila[$motivo] ?? 0;
-                        if ($val > 0) {
-                            $vals_total[] = $val;
+                        if (in_array($motivo, $estimaciones_defecto)) {
+                            $val = $totales_fila[$motivo] ?? 0;
+                            if ($val > 0) {
+                                $vals_total[] = $val;
+                            }
                         }
                     }
                     $max_total_col = empty($vals_total) ? 0 : max($vals_total);
@@ -648,26 +790,23 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
                     $gran_total = 0;
                     foreach ($motivos_final as $motivo): 
                         $suma_fila = $totales_fila[$motivo];
+                        $is_default = in_array($motivo, $estimaciones_defecto);
                     ?>
-                    <tr data-total="<?php echo $suma_fila; ?>">
-
+                    <tr data-motivo="<?php echo htmlspecialchars($motivo); ?>" data-total="<?php echo $suma_fila; ?>" <?php echo !$is_default ? 'style="display: none;"' : ''; ?>>
                         <td class="row-label"><?php echo $motivo; ?></td>
                         <?php foreach ($agencias_display as $ag): 
                             $val = $datos[$motivo][$ag] ?? 0;
                             $bgColor = getHeatmapColor($val, $max_columnas[$ag]);
                         ?>
-                            <td style="background-color: <?php echo $bgColor; ?>; color: <?php echo getHeatmapTextColor($val, $max_columnas[$ag]); ?> !important;">
-                                <?php echo (isset($val) && $val > 0) ? $val : ''; ?>
-                            </td>
-
+                            <td data-agencia="<?php echo htmlspecialchars($ag); ?>" data-raw="<?php echo $val; ?>" style="background-color: <?php echo $bgColor; ?>; color: <?php echo getHeatmapTextColor($val, $max_columnas[$ag]); ?> !important;"><span class="cell-value"><?php echo (isset($val) && $val > 0) ? $val : ''; ?></span></td>
                         <?php endforeach; ?>
                         <?php $bgRow = getHeatmapColor($suma_fila, $max_total_col); ?>
-                        <td class="row-total" style="background-color: <?php echo $bgRow; ?>; color: <?php echo getHeatmapTextColor($suma_fila, $max_total_col); ?> !important;">
-                            <?php echo $suma_fila > 0 ? $suma_fila : ''; ?>
-                        </td>
+                        <td class="row-total" data-row-total-val="<?php echo $suma_fila; ?>" style="background-color: <?php echo $bgRow; ?>; color: <?php echo getHeatmapTextColor($suma_fila, $max_total_col); ?> !important;"><?php echo $suma_fila > 0 ? $suma_fila : ''; ?></td>
                     </tr>
                     <?php 
-                        $gran_total += $suma_fila;
+                        if ($is_default) {
+                            $gran_total += $suma_fila;
+                        }
                     endforeach; 
                     ?>
                 </tbody>
@@ -675,9 +814,9 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
                     <tr>
                         <td class="row-label" style="font-weight:bold; background-color: #C1E5F3; color: #000;">Total general</td>
                         <?php foreach ($agencias_display as $ag): ?>
-                            <td class="col-total"><?php echo $totales_columnas[$ag] > 0 ? $totales_columnas[$ag] : ''; ?></td>
+                            <td class="col-total" data-agencia-total="<?php echo htmlspecialchars($ag); ?>"><?php echo $totales_columnas_inicial[$ag] > 0 ? $totales_columnas_inicial[$ag] : ''; ?></td>
                         <?php endforeach; ?>
-                        <td style="background-color: #E26B0A; color: #fff !important; font-weight: bold;"><?php echo $gran_total; ?></td>
+                        <td id="grand-total-cell" style="background-color: #E26B0A; color: #fff !important; font-weight: bold;"><?php echo $gran_total; ?></td>
                     </tr>
                 </tfoot>
             </table>
@@ -854,29 +993,13 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
 
             function updateText() {
                 const checked = chkCiclos.filter(c => c.checked);
-                if (checked.length === 0 || checked.length === chkCiclos.length) {
-                    text.textContent = 'TODOS';
+                if (checked.length === 0) {
+                    text.textContent = 'Ninguno';
                 } else if (checked.length === 1) {
                     text.textContent = checked[0].value;
                 } else {
-                    // Obtener valores numéricos y ordenar
                     const vals = checked.map(c => parseInt(c.value)).sort((a, b) => a - b);
-                    // Verificar si forman una secuencia con paso constante
-                    const step = vals[1] - vals[0];
-                    let esSecuencia = step > 0;
-                    for (let i = 2; i < vals.length; i++) {
-                        if (vals[i] - vals[i - 1] !== step) {
-                            esSecuencia = false;
-                            break;
-                        }
-                    }
-                    if (esSecuencia) {
-                        text.textContent = vals[0] + ' AL ' + vals[vals.length - 1];
-                    } else if (vals.length <= 4) {
-                        text.textContent = vals.join(', ');
-                    } else {
-                        text.textContent = checked.length + ' sel.';
-                    }
+                    text.textContent = vals[0] + ' AL ' + vals[vals.length - 1];
                 }
             }
 
@@ -989,6 +1112,177 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
                 });
             }
         });
+
+        // ─── LÓGICA DE FILTRADO DE ESTIMACIONES ──────────────────────────────
+        (function() {
+            const btnToggle  = document.getElementById('btn-estim-toggle');
+            const dropdown   = document.getElementById('estim-dropdown');
+            const wrapper    = document.getElementById('estim-wrapper');
+            const selectAll  = document.getElementById('estim-select-all');
+            const chkEstims  = Array.from(document.querySelectorAll('.chk-estim'));
+            const badge      = document.getElementById('estim-desel-badge');
+
+            if (!btnToggle || !dropdown) return;
+
+            // Heatmap color logic mirroring PHP getHeatmapColor
+            function getHeatmapColorJs(val, max) {
+                if (val < 1) return '#FFFFFF';
+                if (max <= 0) return '#FFFFFF';
+                
+                const ratio = val / max;
+                if (ratio <= 0.10) return '#FFFFDF';
+                if (ratio <= 0.20) return '#FFFFB8';
+                if (ratio <= 0.30) return '#FFFF94';
+                if (ratio <= 0.40) return '#FDF190';
+                if (ratio <= 0.50) return '#FCEB93';
+                if (ratio <= 0.60) return '#F9D08D';
+                if (ratio <= 0.70) return '#EBCA8F';
+                if (ratio <= 0.80) return '#F1AA87';
+                if (ratio <= 0.90) return '#F08B82';
+                return '#E57373';
+            }
+
+            function recalcularEstimaciones() {
+                const activeMotivos = new Set(
+                    chkEstims.filter(chk => chk.checked).map(chk => chk.value)
+                );
+
+                const deselCount = chkEstims.length - activeMotivos.size;
+                if (deselCount > 0) {
+                    badge.style.display = 'inline-block';
+                    badge.textContent = deselCount + ' ocult.';
+                    btnToggle.classList.remove('active');
+                } else {
+                    badge.style.display = 'none';
+                    btnToggle.classList.add('active');
+                }
+
+                const rows = Array.from(document.querySelectorAll('#tbody-datos tr'));
+                const agencias = <?php echo json_encode($agencias_display); ?>;
+                const maxColumnas = {};
+                agencias.forEach(ag => maxColumnas[ag] = 0);
+                let maxTotalCol = 0;
+                let grandTotal = 0;
+
+                // First pass: adjust visibility and find dynamic max values
+                rows.forEach(row => {
+                    const motivo = row.getAttribute('data-motivo');
+                    const visible = activeMotivos.has(motivo);
+                    if (visible) {
+                        row.style.display = '';
+                        const totalFila = parseInt(row.getAttribute('data-total')) || 0;
+                        grandTotal += totalFila;
+                        if (totalFila > maxTotalCol) {
+                            maxTotalCol = totalFila;
+                        }
+
+                        agencias.forEach(ag => {
+                            const td = row.querySelector(`td[data-agencia="${ag}"]`);
+                            if (td) {
+                                const val = parseInt(td.getAttribute('data-raw')) || 0;
+                                if (val > maxColumnas[ag]) {
+                                    maxColumnas[ag] = val;
+                                }
+                            }
+                        });
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+
+                // Compute new column totals
+                const colTotals = {};
+                agencias.forEach(ag => colTotals[ag] = 0);
+
+                rows.forEach(row => {
+                    const motivo = row.getAttribute('data-motivo');
+                    const visible = activeMotivos.has(motivo);
+                    if (visible) {
+                        agencias.forEach(ag => {
+                            const td = row.querySelector(`td[data-agencia="${ag}"]`);
+                            if (td) {
+                                const val = parseInt(td.getAttribute('data-raw')) || 0;
+                                colTotals[ag] += val;
+                            }
+                        });
+                    }
+                });
+
+                // Second pass: apply colors
+                rows.forEach(row => {
+                    const motivo = row.getAttribute('data-motivo');
+                    const visible = activeMotivos.has(motivo);
+                    if (visible) {
+                        agencias.forEach(ag => {
+                            const td = row.querySelector(`td[data-agencia="${ag}"]`);
+                            if (td) {
+                                const val = parseInt(td.getAttribute('data-raw')) || 0;
+                                const color = getHeatmapColorJs(val, maxColumnas[ag]);
+                                td.style.backgroundColor = color;
+                            }
+                        });
+
+                        const totalCell = row.querySelector('.row-total');
+                        if (totalCell) {
+                            const val = parseInt(row.getAttribute('data-total')) || 0;
+                            const color = getHeatmapColorJs(val, maxTotalCol);
+                            totalCell.style.backgroundColor = color;
+                        }
+                    }
+                });
+
+                // Update column totals in footer
+                agencias.forEach(ag => {
+                    const tdTotal = document.querySelector(`td[data-agencia-total="${ag}"]`);
+                    if (tdTotal) {
+                        tdTotal.textContent = colTotals[ag] > 0 ? colTotals[ag].toLocaleString('es-MX') : '';
+                    }
+                });
+
+                // Update grand total cell and Registros Totales display
+                const grandTotalCell = document.getElementById('grand-total-cell');
+                if (grandTotalCell) {
+                    grandTotalCell.textContent = grandTotal.toLocaleString('es-MX');
+                }
+
+                const regTotalesValue = document.getElementById('registros-totales-value');
+                if (regTotalesValue) {
+                    regTotalesValue.textContent = grandTotal.toLocaleString('es-MX');
+                }
+            }
+
+            btnToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+            });
+
+            dropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#estim-wrapper')) {
+                    dropdown.style.display = 'none';
+                }
+            });
+
+            selectAll.addEventListener('change', (e) => {
+                const checked = e.target.checked;
+                chkEstims.forEach(chk => chk.checked = checked);
+                recalcularEstimaciones();
+            });
+
+            chkEstims.forEach(chk => {
+                chk.addEventListener('change', () => {
+                    selectAll.checked = chkEstims.every(c => c.checked);
+                    recalcularEstimaciones();
+                });
+            });
+
+            // Initial call to set selectAll check status and correctly format badge
+            selectAll.checked = chkEstims.every(c => c.checked);
+            recalcularEstimaciones();
+        })();
     });
 </script>
 </body>

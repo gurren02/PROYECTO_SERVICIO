@@ -1,4 +1,7 @@
 <?php
+// Configurar la zona horaria por defecto para coincidir con la hora local
+date_default_timezone_set('America/Mexico_City');
+
 // ==============================================================================
 // CONEXIÓN UNIVERSAL A LA BASE DE DATOS (Compatible con XAMPP y Docker)
 // ==============================================================================

@@ -1,3 +1,15 @@
+/* --- Google Fonts: tipografía condensada para SEDEFAC --- */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@200;300;400&family=Oswald:wght@200;300;400&display=swap');
+
+/* =========================================================
+   INDEX.CSS – Página de inicio SEDEFAC
+   ========================================================= */
+
+/* ---------- Contenedor principal del inicio ---------- */
+.idx-main {
+    padding-top: 0;
+}
+
 /* ---------- Bienvenida ---------- */
 .idx-welcome {
     display: flex;
@@ -5,21 +17,27 @@
     justify-content: space-between;
     gap: 16px;
     flex-wrap: wrap;
-    margin-bottom: 36px;
+    margin-bottom: 60px;
 }
 
-.idx-welcome__title {
-    margin: 0 0 4px 0;
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: #1e2b27;
-    letter-spacing: -0.02em;
+.idx-welcome__brand {
+    display: flex;
+    align-items: center;
+    gap: 22px;
 }
 
-.idx-welcome__sub {
-    margin: 0;
-    font-size: 0.9rem;
-    color: #6b7c78;
+.idx-welcome__brand-title {
+    height: 96px;
+    width: auto;
+    display: block;
+}
+
+.idx-welcome__brand-logo {
+    height: 110px;
+    width: auto;
+    display: block;
+    flex-shrink: 0;
+    align-self: center;
 }
 
 .idx-welcome__date {
@@ -27,13 +45,17 @@
     color: #6b7c78;
     font-weight: 500;
     white-space: nowrap;
+    background: #f0f7f4;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid #d8ece5;
 }
 
 /* ---------- Grid de tarjetas ---------- */
 .idx-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 22px;
 }
 
 /* ---------- Tarjeta base ---------- */
@@ -41,114 +63,177 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 26px 24px 22px;
-    border-radius: 14px;
-    background: #ffffff;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-    text-decoration: none;
-    color: #1e2b27;
+    justify-content: flex-end;
+    min-height: 220px;
+    border-radius: 18px;
     overflow: hidden;
-    border: 1px solid #e4ede9;
-    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.22s ease,
-    border-color 0.22s;
+    text-decoration: none;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.25s ease;
 }
 
 .idx-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 32px rgba(26,122,94,0.15);
-    border-color: rgba(26,122,94,0.28);
+    transform: translateY(-6px) scale(1.015);
+    box-shadow: 0 18px 48px rgba(0,0,0,0.22);
 }
 
-/* Glow decorativo */
-.idx-card__glow {
+/* --- Capa de imagen de fondo --- */
+.idx-card__bg {
     position: absolute;
-    top: -40px;
-    right: -40px;
-    width: 130px;
-    height: 130px;
-    border-radius: 50%;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.28s;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    transition: transform 0.4s ease;
+    z-index: 0;
 }
 
-.idx-card:hover .idx-card__glow { opacity: 1; }
+.idx-card:hover .idx-card__bg {
+    transform: scale(1.06);
+}
+
+/* --- Overlay difuminado degradado sobre la imagen --- */
+.idx-card__overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to top,
+        rgba(10, 25, 20, 0.88) 0%,
+        rgba(10, 25, 20, 0.55) 45%,
+        rgba(10, 25, 20, 0.18) 100%
+    );
+    z-index: 1;
+    transition: background 0.3s;
+}
+
+.idx-card:hover .idx-card__overlay {
+    background: linear-gradient(
+        to top,
+        rgba(10, 25, 20, 0.92) 0%,
+        rgba(10, 25, 20, 0.65) 50%,
+        rgba(10, 25, 20, 0.25) 100%
+    );
+}
+
+/* --- Capa de desvanecimiento inferior (cubre el área de texto) --- */
+.idx-card__fade {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60%;
+    background: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.72) 0%,
+        rgba(0, 0, 0, 0.42) 40%,
+        transparent 100%
+    );
+    backdrop-filter: blur(1.5px);
+    -webkit-backdrop-filter: blur(1.5px);
+    z-index: 1;
+    pointer-events: none;
+    transition: height 0.3s ease, opacity 0.3s ease;
+}
+
+.idx-card:hover .idx-card__fade {
+    height: 68%;
+    backdrop-filter: blur(2.5px);
+    -webkit-backdrop-filter: blur(2.5px);
+}
+
+/* --- Contenido sobre el overlay --- */
+.idx-card__content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 22px 22px 20px;
+}
 
 /* Icono */
 .idx-card__icon-wrap {
-    width: 52px;
-    height: 52px;
-    border-radius: 13px;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
-    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(4px);
+    margin-bottom: 8px;
+    border: 1px solid rgba(255,255,255,0.2);
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+                background 0.22s;
 }
 
-.idx-card:hover .idx-card__icon-wrap { transform: scale(1.10); }
+.idx-card:hover .idx-card__icon-wrap {
+    transform: scale(1.12);
+    background: rgba(255,255,255,0.22);
+}
 
 .idx-card__icon {
-    font-size: 26px;
+    font-size: 24px;
+    color: #fff;
     font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 28;
 }
 
 /* Textos */
 .idx-card__title {
-    margin: 0 0 6px 0;
-    font-size: 1.05rem;
+    margin: 0 0 4px 0;
+    font-size: 1.15rem;
     font-weight: 700;
-    color: #1e2b27;
+    color: #fff;
+    letter-spacing: -0.01em;
 }
 
 .idx-card__desc {
     margin: 0;
-    font-size: 0.84rem;
-    color: #6b7c78;
-    line-height: 1.55;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.78);
+    line-height: 1.5;
 }
 
 /* Flecha */
 .idx-card__arrow {
-    align-self: flex-end;
-    font-size: 18px;
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    z-index: 2;
+    font-size: 20px;
+    color: rgba(255,255,255,0.55);
     opacity: 0;
-    transform: translateX(-6px);
-    transition: opacity 0.2s, transform 0.2s;
+    transform: translateX(-8px);
+    transition: opacity 0.22s, transform 0.22s, color 0.22s;
     font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
 }
 
 .idx-card:hover .idx-card__arrow {
     opacity: 1;
     transform: translateX(0);
+    color: #fff;
 }
 
-/* Variantes de color */
-.idx-card--upload .idx-card__icon-wrap { background: #e8f5f1; }
-.idx-card--upload .idx-card__icon      { color: #1a7a5e; }
-.idx-card--upload .idx-card__arrow     { color: #1a7a5e; }
-.idx-card--upload .idx-card__glow      { background: radial-gradient(circle, rgba(26,122,94,0.18), transparent 70%); }
+/* --- Imágenes de fondo por tarjeta --- */
+.idx-card--upload .idx-card__bg  { background-image: url('multimedia/cargar.png'); }
+.idx-card--firme  .idx-card__bg  { background-image: url('multimedia/firme.png'); }
+.idx-card--falso  .idx-card__bg  { background-image: url('multimedia/falso.png'); }
+.idx-card--users  .idx-card__bg  { background-image: url('multimedia/usuarios.png'); }
 
-.idx-card--tables .idx-card__icon-wrap { background: #e2f0ea; }
-.idx-card--tables .idx-card__icon      { color: #1e8a68; }
-.idx-card--tables .idx-card__arrow     { color: #1e8a68; }
-.idx-card--tables .idx-card__glow      { background: radial-gradient(circle, rgba(30,138,104,0.16), transparent 70%); }
-
-.idx-card--calc .idx-card__icon-wrap   { background: #daf0e6; }
-.idx-card--calc .idx-card__icon        { color: #14755a; }
-.idx-card--calc .idx-card__arrow       { color: #14755a; }
-.idx-card--calc .idx-card__glow        { background: radial-gradient(circle, rgba(20,117,90,0.15), transparent 70%); }
-
-.idx-card--users .idx-card__icon-wrap  { background: #d3ebe0; }
-.idx-card--users .idx-card__icon       { color: #0f6248; }
-.idx-card--users .idx-card__arrow      { color: #0f6248; }
-.idx-card--users .idx-card__glow       { background: radial-gradient(circle, rgba(15,98,72,0.14), transparent 70%); }
+/* Tinte de acento en el overlay al hover — verde oscuro uniforme para todas las tarjetas */
+.idx-card--upload:hover .idx-card__overlay,
+.idx-card--firme:hover  .idx-card__overlay,
+.idx-card--falso:hover  .idx-card__overlay,
+.idx-card--users:hover  .idx-card__overlay {
+    background: linear-gradient(to top, rgba(8,60,44,0.92) 0%, rgba(8,60,44,0.60) 50%, rgba(8,60,44,0.20) 100%);
+}
 
 /* Responsive */
 @media (max-width: 640px) {
     .idx-main  { padding: 24px 16px; }
     .idx-grid  { grid-template-columns: 1fr; }
     .sidebar   { top: 76px; }
+    .idx-welcome__acronym { font-size: 1.8rem; }
 }

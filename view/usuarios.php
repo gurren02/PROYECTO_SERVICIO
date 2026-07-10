@@ -65,6 +65,7 @@ $usuarios = $stmt_all->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="../assets/user_estilos.css">
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
     <title>Gestión de Usuarios</title>
 </head>
 <body>

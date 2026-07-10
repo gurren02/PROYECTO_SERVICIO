@@ -13,6 +13,7 @@ $mapa_agencias = [
     'C' => 'SUR',
     'D' => 'ORIENTE',
     'E' => 'PONIENTE',
+    'F' => 'MOTUL',
     'G' => 'PROGRESO',
     'H' => 'HUNUCMA',
     'J' => 'UMAN',
@@ -57,27 +58,63 @@ if ($action === 'init') {
     $nombre_tabla = $tipo_defecto . $anio . $mes_formateado;
 
     try {
-        $pdo->exec("DROP TABLE IF EXISTS `$nombre_tabla`");
-        $create_table_query = "CREATE TABLE `$nombre_tabla` (
+        // En lugar de DROP TABLE, creamos la tabla si no existe (con NOT NULL DEFAULT para evitar que NULL inhabilite el UNIQUE)
+        $create_table_query = "CREATE TABLE IF NOT EXISTS `$nombre_tabla` (
                 `id_registro` INT AUTO_INCREMENT PRIMARY KEY,
                 `anio_carga` INT,
                 `mes_carga` INT,
-                `Rpu` VARCHAR(50),
-                `Nis` VARCHAR(50),
-                `Nombre` VARCHAR(100),
-                `Direccion` VARCHAR(100),
-                `Tarifa` VARCHAR(10),
-                `Codigo` VARCHAR(10),
-                `Tipo` VARCHAR(50),
-                `Anomalia` VARCHAR(50),
-                `Ciclo` INT,
-                `Agencia` VARCHAR(50),
-                `Zona` VARCHAR(50)
-            )";
+                `Rpu` VARCHAR(50) NOT NULL DEFAULT '',
+                `Nis` VARCHAR(50) NOT NULL DEFAULT '',
+                `Nombre` VARCHAR(100) NOT NULL DEFAULT '',
+                `Direccion` VARCHAR(100) NOT NULL DEFAULT '',
+                `Tarifa` VARCHAR(10) NOT NULL DEFAULT '',
+                `Codigo` VARCHAR(10) NOT NULL DEFAULT '',
+                `Tipo` VARCHAR(50) NOT NULL DEFAULT '',
+                `Anomalia` VARCHAR(50) NOT NULL DEFAULT '',
+                `Ciclo` INT NOT NULL DEFAULT 0,
+                `Agencia` VARCHAR(50) NOT NULL DEFAULT '',
+                `Zona` VARCHAR(50) NOT NULL DEFAULT '01',
+                `Comentario` TEXT DEFAULT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
         $pdo->exec($create_table_query);
+
+        // Asegurar la conversión de columnas a NOT NULL si la tabla ya existía con esquema antiguo
+        $pdo->exec("ALTER TABLE `$nombre_tabla` 
+            MODIFY COLUMN `Rpu` VARCHAR(50) NOT NULL DEFAULT '',
+            MODIFY COLUMN `Nis` VARCHAR(50) NOT NULL DEFAULT '',
+            MODIFY COLUMN `Nombre` VARCHAR(100) NOT NULL DEFAULT '',
+            MODIFY COLUMN `Direccion` VARCHAR(100) NOT NULL DEFAULT '',
+            MODIFY COLUMN `Tarifa` VARCHAR(10) NOT NULL DEFAULT '',
+            MODIFY COLUMN `Codigo` VARCHAR(10) NOT NULL DEFAULT '',
+            MODIFY COLUMN `Tipo` VARCHAR(50) NOT NULL DEFAULT '',
+            MODIFY COLUMN `Anomalia` VARCHAR(50) NOT NULL DEFAULT '',
+            MODIFY COLUMN `Ciclo` INT NOT NULL DEFAULT 0,
+            MODIFY COLUMN `Agencia` VARCHAR(50) NOT NULL DEFAULT '',
+            MODIFY COLUMN `Zona` VARCHAR(50) NOT NULL DEFAULT '01'
+        ");
+
+        // Eliminar posibles registros duplicados existentes para poder crear el índice único
+        $pdo->exec("
+            DELETE t1 FROM `$nombre_tabla` t1
+            INNER JOIN `$nombre_tabla` t2 
+            ON t1.id_registro > t2.id_registro 
+            AND t1.Rpu = t2.Rpu 
+            AND t1.Nis = t2.Nis 
+            AND t1.Tipo = t2.Tipo 
+            AND t1.Anomalia = t2.Anomalia 
+            AND t1.Ciclo = t2.Ciclo 
+            AND t1.Agencia = t2.Agencia
+        ");
+
+        // Crear el índice único si no existe
+        try {
+            $pdo->exec("ALTER TABLE `$nombre_tabla` ADD UNIQUE KEY `idx_unique_falso` (`Rpu`, `Nis`, `Tipo`, `Anomalia`, `Ciclo`, `Agencia`)");
+        } catch (PDOException $e) {
+            // Ignorar si ya existe
+        }
     } catch (PDOException $e) {
         unlink($ruta_final);
-        echo json_encode(['error' => 'Error al crear tabla dinámica para Falsos: ' . $e->getMessage()]); exit;
+        echo json_encode(['error' => 'Error al preparar la tabla dinámica para Falsos: ' . $e->getMessage()]); exit;
     }
 
     echo json_encode([
@@ -106,13 +143,7 @@ if ($action === 'process_chunk') {
     if (!file_exists($ruta_final)) {
         echo json_encode(['error' => 'El archivo temporal no existe o se perdió.']); exit;
     }
-
-    // Intentar deducir ciclo por defecto desde el nombre del archivo original
-    $ciclo_defecto = null;
-    if (preg_match('/c(\d+)/i', $original_name, $m)) {
-        $ciclo_defecto = (int)$m[1];
-    }
-
+    
     $handle = fopen($ruta_final, "r");
     
     // Saltar líneas hasta la posición de inicio
@@ -124,7 +155,7 @@ if ($action === 'process_chunk') {
         }
     }
 
-    $insert_query = "INSERT INTO `$nombre_tabla` 
+    $insert_query = "INSERT IGNORE INTO `$nombre_tabla` 
         (`anio_carga`, `mes_carga`, `Rpu`, `Nis`, `Nombre`, `Direccion`, `Tarifa`, `Codigo`, `Tipo`, `Anomalia`, `Ciclo`, `Agencia`, `Zona`) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     $stmt = $pdo->prepare($insert_query);
@@ -161,7 +192,7 @@ if ($action === 'process_chunk') {
         $letra_agencia = (strlen($first_col) >= 7) ? strtoupper($first_col[6]) : '';
         $agencia = $mapa_agencias[$letra_agencia] ?? '';
 
-        // Derivar Ciclo desde los primeros 2 caracteres de la primera columna
+        // Derivar Ciclo desde los primeros 2 caracteres de la primera columna (e.g. 23)
         $ciclo = (int)substr($first_col, 0, 2);
 
         // Zona por defecto '01'
@@ -231,6 +262,51 @@ if ($action === 'finish') {
     }
 
     echo json_encode(['status' => 'ok', 'message' => 'Carga de Falsos completada y bitácora registrada.']);
+    exit;
+}
+
+if ($action === 'get_history') {
+    try {
+        $stmt = $pdo->prepare("SELECT id_archivo, nombre_tabla, anio_asociado, mes_asociado, nombre_archivo_original, fecha_subida FROM registro_archivos WHERE tipo_registro = 'falsos' ORDER BY fecha_subida DESC");
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['status' => 'ok', 'data' => $rows]);
+    } catch (PDOException $e) {
+        echo json_encode(['error' => 'Error al obtener historial: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($action === 'delete_history') {
+    $id_archivo = isset($_POST['id_archivo']) ? (int)$_POST['id_archivo'] : 0;
+    if ($id_archivo <= 0) {
+        echo json_encode(['error' => 'ID de archivo no válido.']);
+        exit;
+    }
+
+    try {
+        // Consultar el nombre de la tabla para este archivo
+        $stmt = $pdo->prepare("SELECT nombre_tabla FROM registro_archivos WHERE id_archivo = ? AND tipo_registro = 'falsos'");
+        $stmt->execute([$id_archivo]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($row) {
+            $nombre_tabla = $row['nombre_tabla'];
+            
+            // Eliminar tabla dinámica de anomalías
+            $pdo->exec("DROP TABLE IF EXISTS `$nombre_tabla`");
+            
+            // Eliminar registro de bitácora
+            $stmt_del = $pdo->prepare("DELETE FROM registro_archivos WHERE id_archivo = ?");
+            $stmt_del->execute([$id_archivo]);
+            
+            echo json_encode(['status' => 'ok', 'message' => 'Datos eliminados correctamente.']);
+        } else {
+            echo json_encode(['error' => 'No se encontró el registro o no pertenece a Falsos.']);
+        }
+    } catch (PDOException $e) {
+        echo json_encode(['error' => 'Error al eliminar datos: ' . $e->getMessage()]);
+    }
     exit;
 }
 

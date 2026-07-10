@@ -30,9 +30,19 @@ if (isset($_GET['ciclo'])) {
     }
 }
 
+$filtro_ciclo_cd = [];
+if (isset($_GET['ciclo_cd'])) {
+    if (is_array($_GET['ciclo_cd'])) {
+        $filtro_ciclo_cd = $_GET['ciclo_cd'];
+    } else {
+        $filtro_ciclo_cd = array_filter(explode(',', (string)$_GET['ciclo_cd']), 'strlen');
+    }
+}
+
 // ICF TOTAL: Ignora filtros de ciclo
 if (isset($_GET['icf_total']) && $_GET['icf_total'] === '1') {
     $filtro_ciclo = [];
+    $filtro_ciclo_cd = [];
 }
 
 // Calcular sufijos
@@ -48,7 +58,7 @@ if ($tipo_comp === 'anual') {
 
 $mapa_agencias = [
     'A'=>'CENTRO','B'=>'NORTE','C'=>'SUR','D'=>'ORIENTE','E'=>'PONIENTE',
-    'G'=>'PROGRESO','H'=>'HUNUCMA','J'=>'UMAN','K'=>'ACANCEH','M'=>'CONKAL'
+    'F'=>'MOTUL','G'=>'PROGRESO','H'=>'HUNUCMA','J'=>'UMAN','K'=>'ACANCEH','M'=>'CONKAL'
 ];
 
 $anomalias = ['cancelaciones','estimaciones','consumos_cero','servicios_sin_medicion',
@@ -105,7 +115,12 @@ foreach ($anomalias as $anomalia) {
             $where .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
             $params[] = (int)$filtro_zona;
         }
-        $where .= buildCicloCol($filtro_ciclo, $params);
+        
+        if ($anomalia === 'cargas_directas') {
+            $where .= buildCicloCol($filtro_ciclo_cd, $params);
+        } else {
+            $where .= buildCicloCol($filtro_ciclo, $params);
+        }
 
         $stmt_actual = $pdo->prepare(
             "SELECT TRIM(`Rpu`) as rpu, TRIM(`Zona`) as zona, UPPER(TRIM(`Agencia`)) as agencia
@@ -117,8 +132,11 @@ foreach ($anomalias as $anomalia) {
         $conteo = []; // [zona][agencia] = set de RPUs reincidentes únicos
         while ($row = $stmt_actual->fetch(PDO::FETCH_ASSOC)) {
             $rpu  = $row['rpu'];
-            $zona = $row['zona'];
+            $zona = (string)(int)$row['zona'];
             $ag   = $row['agencia'];
+            if ((int)$zona === 1 && ($ag === 'F' || strtoupper(trim($ag)) === 'MOTUL')) {
+                continue;
+            }
             if ($zona === '' || $zona === null) continue;
             if (!isset($rpu_set[$rpu])) continue; // No reincidente
 

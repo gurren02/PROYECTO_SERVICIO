@@ -331,7 +331,7 @@ body.con-sidebar-abierto main {
     align-items: center;
     justify-content: center;     /* centrado cuando colapsado */
     gap: 0;
-    padding: 20px 12px 16px;
+    padding: 20px 10px 16px 14px;
     flex-shrink: 0;
     min-height: 72px;
     position: relative;
@@ -345,29 +345,53 @@ body.con-sidebar-abierto main {
     padding: 20px 16px 16px;
 }
 
-/* Logo CFE */
+/* Logo SEDEFAC */
 .sidebar__logo {
     display: flex;
     align-items: center;
+    gap: 8px;
     flex-shrink: 0;
     overflow: hidden;
-    width: 0;
-    opacity: 0;
+    min-width: 0;
     transition: width 0.25s 0.05s, opacity 0.20s;
 }
 
 .sidebar.sidebar--open .sidebar__logo {
-    width: 64px;
+    width: auto;
     opacity: 1;
 }
 
 .sidebar__logo-img {
-    height: 28px;
-    width: auto;
-    /* El logo SVG de CFE es verde sobre fondo claro;
-       invertimos para que sea visible sobre el fondo oscuro */
-    filter: brightness(0) invert(1);
     display: block;
+    flex-shrink: 0;
+}
+
+/* Ícono (logo blanco pequeño) — siempre visible */
+.sidebar__logo-icon {
+    height: 32px;
+    width: auto;
+    transition: height 0.25s 0.05s;
+}
+
+/* Sidebar colapsado: icono más pequeño */
+.sidebar:not(.sidebar--open) .sidebar__logo-icon {
+    height: 18px;
+}
+
+/* Texto (título negativo) — aparece/desaparece con el sidebar */
+.sidebar__logo-text {
+    height: 14px;
+    width: auto;
+    opacity: 0;
+    max-width: 0;
+    overflow: hidden;
+    transition: opacity 0.2s 0.05s, max-width 0.25s 0.05s;
+    white-space: nowrap;
+}
+
+.sidebar.sidebar--open .sidebar__logo-text {
+    opacity: 1;
+    max-width: 160px;
 }
 
 /* Botón toggle (el "<" / ">" de la imagen) */
