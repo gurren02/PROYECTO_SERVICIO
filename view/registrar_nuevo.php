@@ -5,7 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 include "../src/seguridad.php";
 
-if (!isset($_SESSION['rol']) || $_SESSION['rol'] !== 'admin') {
+if (!isset($_SESSION['rol']) || !in_array($_SESSION['rol'], ['admin', 'oficinista'])) {
     header("Location: index.php");
     exit();
 }
@@ -56,8 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registrar'])) {
         $mensaje      = 'Las contraseñas no coinciden. Verifica e intenta de nuevo.';
         $tipo_mensaje = 'error';
 
-    } elseif ($rol === 'usuario' && empty($zona)) {
-        $mensaje      = 'La Zona asignada es obligatoria para usuarios con el rol "Usuario".';
+    } elseif ($rol === 'admin' && $_SESSION['rol'] !== 'admin') {
+        $mensaje      = 'Operacion no autorizada: Los oficinistas no pueden registrar usuarios administradores.';
+        $tipo_mensaje = 'error';
+
+    } elseif ($rol !== 'admin' && empty($zona)) {
+        $mensaje      = 'La Zona asignada es obligatoria para usuarios con roles distintos a Administrador.';
         $tipo_mensaje = 'error';
 
     } else {
@@ -129,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registrar'])) {
     <link rel="stylesheet" href="../assets/header.css">
     <link rel="stylesheet" href="../assets/user_estilos.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logo_cf.webp">
     <title>Registrar Nuevo Usuario</title>
 </head>
 <body>
@@ -262,10 +266,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registrar'])) {
                             <span class="material-symbols-rounded">manage_accounts</span>
                             Rol de usuario <span class="reg-required-star">*</span>
                         </label>
-                        <select id="rol" name="rol" class="reg-form__control" required onchange="toggleZonaField()">
-                            <option value="usuario" <?php echo ($form_data['rol'] === 'usuario') ? 'selected' : ''; ?>>Usuario</option>
-                            <option value="admin" <?php echo ($form_data['rol'] === 'admin') ? 'selected' : ''; ?>>Administrador</option>
-                        </select>
+                         <select id="rol" name="rol" class="reg-form__control" required onchange="toggleZonaField()">
+                             <option value="usuario" <?php echo ($form_data['rol'] === 'usuario') ? 'selected' : ''; ?>>Usuario</option>
+                             <option value="supervisor" <?php echo ($form_data['rol'] === 'supervisor') ? 'selected' : ''; ?>>Supervisor</option>
+                             <option value="oficinista" <?php echo ($form_data['rol'] === 'oficinista') ? 'selected' : ''; ?>>Oficinista</option>
+                             <?php if ($_SESSION['rol'] === 'admin'): ?>
+                                 <option value="admin" <?php echo ($form_data['rol'] === 'admin') ? 'selected' : ''; ?>>Administrador</option>
+                             <?php endif; ?>
+                         </select>
                     </div>
                     <div class="reg-form__group" id="group-zona">
                         <label class="reg-form__label" for="zona">

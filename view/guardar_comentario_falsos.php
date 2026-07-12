@@ -66,8 +66,9 @@ try {
     $userlog = isset($_SESSION['userlog']) ? $_SESSION['userlog'] : 'desconocido';
     $usuario_str = $nombre_completo . ' (' . $userlog . ')';
     
-    $stmt_hist = $pdo->prepare("INSERT INTO `falsos_comentarios_historial` (tabla, id_registro, rpu, usuario, comentario, fecha_registro) VALUES (?, ?, ?, ?, ?, NOW())");
-    $stmt_hist->execute([$tabla, $id_registro, $rpu, $usuario_str, $comentario]);
+    $fecha_actual = date('Y-m-d H:i:s');
+    $stmt_hist = $pdo->prepare("INSERT INTO `falsos_comentarios_historial` (tabla, id_registro, rpu, usuario, comentario, fecha_registro) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt_hist->execute([$tabla, $id_registro, $rpu, $usuario_str, $comentario, $fecha_actual]);
     $new_id = $pdo->lastInsertId();
 
     // 2. Actualizar el último comentario en la tabla principal para todos los registros con este Rpu
@@ -79,7 +80,7 @@ try {
         $stmt->execute([$comentario, $id_registro]);
     }
 
-    echo json_encode(['status' => 'ok', 'ultimo_comentario' => $comentario, 'id_comentario' => (int)$new_id]);
+    echo json_encode(['status' => 'ok', 'ultimo_comentario' => $comentario, 'id_comentario' => (int)$new_id, 'fecha_registro' => $fecha_actual]);
 } catch (PDOException $e) {
     echo json_encode(['error' => 'Error base de datos: ' . $e->getMessage()]);
 }

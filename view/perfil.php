@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // 1. SIEMPRE EN LA LÍNEA 1: Iniciar sesión de forma segura y poner el candado
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -110,7 +110,7 @@ $datos = $stmt_user->fetch(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="../assets/header.css">
     <link rel="stylesheet" href="../assets/user_estilos.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logo_cf.webp">
     <title>Mi Perfil</title>
 </head>
 <body>

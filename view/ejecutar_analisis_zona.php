@@ -264,18 +264,18 @@ foreach ($anomalias as $anomalia) {
     if (isset($todas_las_tablas[$nombre_tabla_act])) {
         $tablas_involucradas[] = $nombre_tabla_act;
         try {
-            $stmt_z = $pdo->query("SELECT DISTINCT CAST(TRIM(`Zona`) AS UNSIGNED) as z FROM `$nombre_tabla_act` WHERE `Zona` IS NOT NULL AND `Zona` != ''");
-            while($rz = $stmt_z->fetch(PDO::FETCH_ASSOC)) { $zonas_disponibles[] = (int)$rz['z']; }
-            $stmt_c = $pdo->query("SELECT DISTINCT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$nombre_tabla_act` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != ''");
-            while($rc = $stmt_c->fetch(PDO::FETCH_ASSOC)) { $ciclos_actuales[] = (int)$rc['c']; }
+            $stmt_z = $pdo->query("SELECT DISTINCT `Zona` FROM `$nombre_tabla_act` WHERE `Zona` IS NOT NULL AND `Zona` != ''");
+            while($rz = $stmt_z->fetch(PDO::FETCH_ASSOC)) { $zonas_disponibles[] = (int)trim($rz['Zona']); }
+            $stmt_c = $pdo->query("SELECT DISTINCT `Ciclo` FROM `$nombre_tabla_act` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != ''");
+            while($rc = $stmt_c->fetch(PDO::FETCH_ASSOC)) { $ciclos_actuales[] = (int)trim($rc['Ciclo']); }
         } catch (PDOException $e) {}
     }
     
     $nombre_tabla_comp = $anomalia . $sufijos['bimestre'];
     if (isset($todas_las_tablas[$nombre_tabla_comp])) {
         try {
-            $stmt_cc = $pdo->query("SELECT DISTINCT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$nombre_tabla_comp` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != ''");
-            while($rc = $stmt_cc->fetch(PDO::FETCH_ASSOC)) { $ciclos_comparacion[] = (int)$rc['c']; }
+            $stmt_cc = $pdo->query("SELECT DISTINCT `Ciclo` FROM `$nombre_tabla_comp` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != ''");
+            while($rc = $stmt_cc->fetch(PDO::FETCH_ASSOC)) { $ciclos_comparacion[] = (int)trim($rc['Ciclo']); }
         } catch (PDOException $e) {}
     }
 }
@@ -289,8 +289,8 @@ $ciclos_cd_disponibles = [];
 $tabla_cd_actual = 'cargas_directas' . $sufijos['actual'];
 if (isset($todas_las_tablas[$tabla_cd_actual])) {
     try {
-        $stmt_cd = $pdo->query("SELECT DISTINCT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$tabla_cd_actual` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != ''");
-        while($rcd = $stmt_cd->fetch(PDO::FETCH_ASSOC)) { $ciclos_cd_disponibles[] = (int)$rcd['c']; }
+        $stmt_cd = $pdo->query("SELECT DISTINCT `Ciclo` FROM `$tabla_cd_actual` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != ''");
+        while($rcd = $stmt_cd->fetch(PDO::FETCH_ASSOC)) { $ciclos_cd_disponibles[] = (int)trim($rcd['Ciclo']); }
     } catch (PDOException $e) {}
 }
 sort($ciclos_cd_disponibles);
@@ -305,10 +305,14 @@ foreach ($sufijos as $_sufijo_mapa) {
         $_tabla_mapa = $_anom_mapa . $_sufijo_mapa;
         if (!isset($todas_las_tablas[$_tabla_mapa])) continue;
         try {
-            $_stmt_mapa = $pdo->query("SELECT DISTINCT CAST(TRIM(`Zona`) AS UNSIGNED) as z, CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$_tabla_mapa` WHERE `Zona` IS NOT NULL AND `Zona` != '' AND `Ciclo` IS NOT NULL AND `Ciclo` != '' AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))");
+            $_stmt_mapa = $pdo->query("SELECT DISTINCT `Zona`, `Ciclo`, `Agencia` FROM `$_tabla_mapa` WHERE `Zona` IS NOT NULL AND `Zona` != '' AND `Ciclo` IS NOT NULL AND `Ciclo` != ''");
             while ($_r = $_stmt_mapa->fetch(PDO::FETCH_ASSOC)) {
-                $_z = (int)$_r['z'];
-                $_c = (int)$_r['c'];
+                $_z = (int)trim($_r['Zona']);
+                $_c = (int)trim($_r['Ciclo']);
+                $_a = strtoupper(trim($_r['Agencia']));
+                if ($_z === 1 && ($_a === 'F' || $_a === 'MOTUL')) {
+                    continue;
+                }
                 if (!isset($ciclos_por_zona[$_z])) $ciclos_por_zona[$_z] = [];
                 $ciclos_por_zona[$_z][$_c] = true;
             }
@@ -346,9 +350,9 @@ $conteos_por_ciclo = [];
 $tabla_estimaciones_actual = 'estimaciones' . $sufijos['actual'];
 if (isset($todas_las_tablas[$tabla_estimaciones_actual])) {
     try {
-        $stmt_cnt = $pdo->query("SELECT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c, COUNT(*) as cnt FROM `$tabla_estimaciones_actual` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != '' GROUP BY c");
+        $stmt_cnt = $pdo->query("SELECT `Ciclo`, COUNT(*) as cnt FROM `$tabla_estimaciones_actual` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != '' GROUP BY `Ciclo`");
         while ($r = $stmt_cnt->fetch(PDO::FETCH_ASSOC)) {
-            $c_val = (int)$r['c'];
+            $c_val = (int)trim($r['Ciclo']);
             $cnt_val = (int)$r['cnt'];
             $conteos_por_ciclo[$c_val] = $cnt_val;
         }
@@ -399,7 +403,7 @@ if (in_array(79, $ciclos_actuales_filtrados)) {
     $tabla_cd_actual = 'cargas_directas' . $sufijos['actual'];
     if (isset($todas_las_tablas[$tabla_cd_actual])) {
         try {
-            $stmt_cd_check = $pdo->prepare("SELECT COUNT(*) FROM `$tabla_cd_actual` WHERE CAST(TRIM(`Ciclo`) AS UNSIGNED) = 80");
+            $stmt_cd_check = $pdo->prepare("SELECT COUNT(*) FROM `$tabla_cd_actual` WHERE `Ciclo` = '80'");
             $stmt_cd_check->execute();
             if ((int)$stmt_cd_check->fetchColumn() > 0) {
                 if (!in_array(80, $ciclos_actuales_filtrados)) {
@@ -465,11 +469,13 @@ function buildCicloWhere($filtro_ciclo, &$params, $alias = '') {
     if (!empty($filtro_ciclo)) {
         $placeholders = [];
         foreach ($filtro_ciclo as $c) {
-            $params[] = (int)$c;
+            $params[] = (string)(int)$c;
+            $params[] = str_pad((int)$c, 2, '0', STR_PAD_LEFT);
+            $placeholders[] = '?';
             $placeholders[] = '?';
         }
         $ph = implode(',', $placeholders);
-        return " AND CAST(TRIM($col) AS UNSIGNED) IN ($ph)";
+        return " AND $col IN ($ph)";
     }
     return "";
 }
@@ -484,10 +490,11 @@ foreach ($sufijos as $periodo_key => $sufijo) {
             $where_sql = "WHERE 1=1";
             $parametros_sql = [];
             if ($filtro_zona !== '')  {
-                $where_sql .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
-                $parametros_sql[] = (int)$filtro_zona;
+                $where_sql .= " AND `Zona` IN (?, ?)";
+                $parametros_sql[] = (string)(int)$filtro_zona;
+                $parametros_sql[] = str_pad((int)$filtro_zona, 2, '0', STR_PAD_LEFT);
             }
-            $where_sql .= " AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`$columna_agencia`)) = 'F' OR UPPER(TRIM(`$columna_agencia`)) = 'MOTUL'))";
+            $where_sql .= " AND NOT (`Zona` IN ('1', '01') AND (`$columna_agencia` IN ('F', 'MOTUL', 'f', 'motul')))";
             // Cargas directas usa su propio filtro de ciclo independiente, pero el mismo filtro de zona general
             if ($anomalia === 'cargas_directas') {
                 if (!empty($filtro_ciclo_cd)) {
@@ -563,7 +570,7 @@ if (isset($resultados['actual'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logo_cf.webp">
     <title>Reporte Nivel Zona</title>
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/header.css">
@@ -1273,10 +1280,11 @@ if (isset($resultados['actual'])) {
 
     <?php
     // Helper: devuelve inline style de bg/color para la celda % Evol según el valor (escala homologada de 10 niveles, amarilla-roja para positivos y verde para negativos)
-    function evolStyle($evol, $max) {
+    function evolStyle($evol, $max_pos, $max_neg) {
         if ($evol === null) return 'background: #FFFFF0 !important; color: #000000 !important;';
         $v = (float)$evol;
         if (abs($v) < 0.01) return 'background: #FFFFF0 !important; color: #000000 !important;';
+        $max = ($v > 0) ? $max_pos : $max_neg;
         if ($max <= 0) return 'background: #FFFFF0 !important; color: #000000 !important;';
  
         $ratio = abs($v) / $max;
@@ -1403,9 +1411,21 @@ if (isset($resultados['actual'])) {
                     }
 
                     // Pre-calcular promedios ajustados para las columnas de % Evol en el Reporte Zona
-                    $evols_por_columna = [];
-                    $evols_def_columna = [];
+                    $evols_pos_por_columna = [];
+                    $evols_neg_por_columna = [];
+                    $evols_pos_def_columna = [];
+                    $evols_neg_def_columna = [];
                     foreach ($orden_agencias as $ag_name) {
+                        if ($ag_name === 'MOTUL') {
+                            $total_motul = 0;
+                            foreach ($anomalias as $anomalia) {
+                                $total_motul += ($resultados_finales['actual'][$ag_name][$anomalia] ?? 0);
+                                $total_motul += ($resultados_finales['bimestre'][$ag_name][$anomalia] ?? 0);
+                            }
+                            if ($total_motul == 0) {
+                                continue;
+                            }
+                        }
                         $def_act = 0;
                         $def_bim = 0;
                         foreach ($anomalias as $anomalia) {
@@ -1420,7 +1440,11 @@ if (isset($resultados['actual'])) {
                                 $ev = ($diff / $val_bim) * 100;
                             }
                             if ($ev !== null && abs($ev) > 0.01) {
-                                $evols_por_columna[$anomalia][] = abs($ev);
+                                if ($ev > 0) {
+                                    $evols_pos_por_columna[$anomalia][] = $ev;
+                                } else {
+                                    $evols_neg_por_columna[$anomalia][] = abs($ev);
+                                }
                             }
                         }
                         $diff_def = $def_act - $def_bim;
@@ -1430,15 +1454,23 @@ if (isset($resultados['actual'])) {
                             $ev_def = ($diff_def / $def_bim) * 100;
                         }
                         if ($ev_def !== null && abs($ev_def) > 0.01) {
-                            $evols_def_columna[] = abs($ev_def);
+                            if ($ev_def > 0) {
+                                $evols_pos_def_columna[] = $ev_def;
+                            } else {
+                                $evols_neg_def_columna[] = abs($ev_def);
+                            }
                         }
                     }
-                    $max_evol = [];
+                    $max_evol_pos = [];
+                    $max_evol_neg = [];
                     foreach ($anomalias as $anomalia) {
-                        $vals = isset($evols_por_columna[$anomalia]) ? $evols_por_columna[$anomalia] : [];
-                        $max_evol[$anomalia] = empty($vals) ? 0 : max($vals);
+                        $vals_pos = isset($evols_pos_por_columna[$anomalia]) ? $evols_pos_por_columna[$anomalia] : [];
+                        $max_evol_pos[$anomalia] = empty($vals_pos) ? 0 : max($vals_pos);
+                        $vals_neg = isset($evols_neg_por_columna[$anomalia]) ? $evols_neg_por_columna[$anomalia] : [];
+                        $max_evol_neg[$anomalia] = empty($vals_neg) ? 0 : max($vals_neg);
                     }
-                    $max_evol['defectos'] = empty($max_evol) ? 0 : max($max_evol);
+                    $max_evol_pos['defectos'] = empty($evols_pos_def_columna) ? 0 : max($evols_pos_def_columna);
+                    $max_evol_neg['defectos'] = empty($evols_neg_def_columna) ? 0 : max($evols_neg_def_columna);
 
                     $idx_row = 0;
                     foreach ($orden_agencias as $agencia):
@@ -1529,7 +1561,7 @@ if (isset($resultados['actual'])) {
                                     } else {
                                         $evol = ($diferencia / $val_bimestre) * 100;
                                     }
-                                    $evol_style = evolStyle($evol, $max_evol[$anomalia]);
+                                    $evol_style = evolStyle($evol, $max_evol_pos[$anomalia], $max_evol_neg[$anomalia]);
                                     ?>
                                     <td class="ea-td-evol evol-col" data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="evol" data-raw-act="<?php echo $val_actual; ?>" data-raw-bim="<?php echo $val_bimestre; ?>" style="<?php echo $evol_style; ?>">
                                         <?php echo $evol !== null ? (($evol > 0 ? '+' : '') . number_format($evol, 1) . '%') : '—'; ?>
@@ -1554,11 +1586,11 @@ if (isset($resultados['actual'])) {
                                 $clase_dif_defecto = $dif_defecto > 0 ? 'dif-pos' : ($dif_defecto < 0 ? 'dif-neg' : 'dif-zero');
                                 $signo_defecto = $dif_defecto > 0 ? '+' : '';
                                 if ($defecto_fila_bimestre == 0) {
-                                    $evol_def = ($defecto_fila_actual == 0) ? 0.0 : 100.0;
-                                } else {
-                                    $evol_def = ($dif_defecto / $defecto_fila_bimestre) * 100;
-                                }
-                                $evol_def_style = evolStyle($evol_def, $max_evol['defectos']);
+                                        $evol_def = ($defecto_fila_actual == 0) ? 0.0 : 100.0;
+                                    } else {
+                                        $evol_def = ($dif_defecto / $defecto_fila_bimestre) * 100;
+                                    }
+                                    $evol_def_style = evolStyle($evol_def, $max_evol_pos['defectos'], $max_evol_neg['defectos']);
                                 ?>
                                 <td class="b-left ea-td-defecto" data-cell-type="actual" data-raw="<?php echo $defecto_fila_actual; ?>" data-val="<?php echo $defecto_fila_actual; ?>"><?php echo number_format($defecto_fila_actual); ?></td>
                                 <td class="ea-td-defecto" data-cell-type="bimestre" data-raw="<?php echo $defecto_fila_bimestre; ?>" data-val="<?php echo $defecto_fila_bimestre; ?>"><?php echo number_format($defecto_fila_bimestre); ?></td>
@@ -1623,7 +1655,7 @@ if (isset($resultados['actual'])) {
                             } else {
                                 $tot_evol = ($tot_dif / $tot_bim) * 100;
                             }
-                            $tot_evol_style = evolStyle($tot_evol, $max_evol[$anomalia]);
+                            $tot_evol_style = evolStyle($tot_evol, $max_evol_pos[$anomalia], $max_evol_neg[$anomalia]);
                             ?>
                             <td class="ea-td-evol evol-col" data-anom-cell="<?php echo $anomalia; ?>" data-cell-type="evol" data-raw-act="<?php echo $tot_act; ?>" data-raw-bim="<?php echo $tot_bim; ?>" style="<?php echo $tot_evol_style; ?>">
                                 <?php echo $tot_evol !== null ? (($tot_evol > 0 ? '+' : '') . number_format($tot_evol, 1) . '%') : '—'; ?>
@@ -1642,7 +1674,7 @@ if (isset($resultados['actual'])) {
                         } else {
                             $gran_evol_def = ($gran_dif_defecto / $gran_defecto_bimestre) * 100;
                         }
-                        $gran_evol_style = evolStyle($gran_evol_def, $max_evol['defectos']);
+                        $gran_evol_style = evolStyle($gran_evol_def, $max_evol_pos['defectos'], $max_evol_neg['defectos']);
                         ?>
                         <td class="b-left ea-td-defecto"><?php echo number_format($gran_defecto_actual); ?></td>
                         <td class="ea-td-defecto"><?php echo number_format($gran_defecto_bimestre); ?></td>
@@ -2743,9 +2775,10 @@ if (isset($resultados['actual'])) {
             const table = document.getElementById('tabla-zona-main');
             if (!table) return;
 
-            // Primero: calcular los nuevos valores de evol para cada fila y encontrar el máximo absoluto
+            // Primero: calcular los nuevos valores de evol para cada fila y encontrar los máximos positivos y negativos
             const rowData = [];
-            let maxEvol = 0;
+            let maxEvolPos = 0;
+            let maxEvolNeg = 0;
 
             table.querySelectorAll('tbody tr').forEach(row => {
                 let sumAct = 0, sumBim = 0;
@@ -2770,9 +2803,10 @@ if (isset($resultados['actual'])) {
                     evolVal = (dif / sumBim) * 100;
                 }
                 if (evolVal !== null && Math.abs(evolVal) > 0.01) {
-                    const absEvol = Math.abs(evolVal);
-                    if (absEvol > maxEvol) {
-                        maxEvol = absEvol;
+                    if (evolVal > 0) {
+                        if (evolVal > maxEvolPos) maxEvolPos = evolVal;
+                    } else {
+                        if (Math.abs(evolVal) > maxEvolNeg) maxEvolNeg = Math.abs(evolVal);
                     }
                 }
 
@@ -2785,7 +2819,7 @@ if (isset($resultados['actual'])) {
                 });
             });
 
-            // Segundo: aplicar los valores y calcular colores usando maxEvol
+            // Segundo: aplicar los valores y calcular colores usando maxEvolPos y maxEvolNeg
             rowData.forEach(data => {
                 const row = data.row;
                 const sumAct = data.sumAct;
@@ -2831,30 +2865,26 @@ if (isset($resultados['actual'])) {
                 }
 
                 if (defEvolCell) {
-                    let evolText = '—', bg = '#FFF9D0', fg = '#000000';
+                    let evolText = '—', bg = '#FFFFF0', fg = '#000000';
                     if (evolVal !== null) {
                         evolText = (evolVal > 0 ? '+' : '') + evolVal.toFixed(1) + '%';
                         const a = Math.abs(evolVal);
 
                         if (a < 0.01) {
-                            bg = '#FFF9D0'; fg = '#000000';
-                        } else if (maxEvol > 0) {
-                            const ratio = a / maxEvol;
-                            if (evolVal > 0) {
-                                // Positivos
-                                if (ratio <= 0.50) { bg = '#FFE082'; fg = '#000000'; }
-                                else if (ratio <= 0.80) { bg = '#FFB74D'; fg = '#000000'; }
-                                else { bg = '#FF5555'; fg = '#000000'; }
-                            } else {
-                                // Negativos
-                                if (ratio <= 0.80) { bg = '#C8E6C9'; fg = '#000000'; }
-                                else if (ratio <= 0.95) { bg = '#66BB6A'; fg = '#000000'; }
-                                else { bg = '#2E7D32'; fg = '#ffffff'; }
+                            bg = '#FFFFF0'; fg = '#000000';
+                        } else {
+                            const max = evolVal > 0 ? maxEvolPos : maxEvolNeg;
+                            if (max > 0) {
+                                const style = getHeatmapStyleJS(evolVal, max);
+                                bg = style.bg;
+                                fg = style.text;
                             }
                         }
                     }
                     defEvolCell.style.background = bg;
+                    defEvolCell.style.setProperty('background-color', bg, 'important');
                     defEvolCell.style.color = fg;
+                    defEvolCell.style.setProperty('color', fg, 'important');
                     defEvolCell.style.fontWeight = '700';
                     defEvolCell.textContent = evolText;
                 }

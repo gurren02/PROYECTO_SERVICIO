@@ -42,7 +42,7 @@ try {
     $columnas = $stmt_cols->fetchAll(PDO::FETCH_COLUMN);
 
     $where = "WHERE 1=1";
-    $where .= " AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))";
+    $where .= " AND NOT (`Zona` IN ('1', '01') AND (`Agencia` IN ('F', 'MOTUL', 'f', 'motul')))";
     $params = [];
 
     if ($agencia !== '') {
@@ -50,23 +50,26 @@ try {
         $params[] = $agencia_busqueda;
     }
     if ($zona !== '') {
-        $where .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
-        $params[] = (int)$zona;
+        $where .= " AND `Zona` IN (?, ?)";
+        $params[] = (string)(int)$zona;
+        $params[] = str_pad((int)$zona, 2, '0', STR_PAD_LEFT);
     }
 
     // Lógica de Ciclo Múltiple
     if (!empty($filtro_ciclo)) {
         $placeholders = [];
         foreach ($filtro_ciclo as $c) {
-            $params[] = (int)$c;
+            $params[] = (string)(int)$c;
+            $params[] = str_pad((int)$c, 2, '0', STR_PAD_LEFT);
+            $placeholders[] = '?';
             $placeholders[] = '?';
         }
         $ph = implode(',', $placeholders);
-        $where .= " AND CAST(TRIM(`Ciclo`) AS UNSIGNED) IN ($ph)";
+        $where .= " AND `Ciclo` IN ($ph)";
     }
 
     if ($modo === 'reincidente' && $tablacomp !== '') {
-        $where .= " AND TRIM(`Rpu`) IN (SELECT TRIM(`Rpu`) FROM `$tablacomp` WHERE `Rpu` IS NOT NULL AND TRIM(`Rpu`) != '')";
+        $where .= " AND `Rpu` IN (SELECT `Rpu` FROM `$tablacomp` WHERE `Rpu` IS NOT NULL AND `Rpu` != '')";
     }
 
     $stmt = $pdo->prepare("SELECT * FROM `$tabla` $where LIMIT 500");

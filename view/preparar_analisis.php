@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // 1. INICIO DE SESIÓN Y SEGURIDAD (¡SIEMPRE EN LA LÍNEA 1, ANTES DEL HTML!)
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -96,7 +96,7 @@ if (isset($_REQUEST['mes_objetivo'], $_REQUEST['anio_objetivo'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logo_cf.webp">
     <title>Preparar Análisis</title>
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/preparar_analisis.css">

@@ -72,11 +72,13 @@ function buildCicloCol($filtro_ciclo, &$params) {
     if (!empty($filtro_ciclo)) {
         $placeholders = [];
         foreach ($filtro_ciclo as $c) {
-            $params[] = (int)$c;
+            $params[] = (string)(int)$c;
+            $params[] = str_pad((int)$c, 2, '0', STR_PAD_LEFT);
+            $placeholders[] = '?';
             $placeholders[] = '?';
         }
         $ph = implode(',', $placeholders);
-        return " AND CAST(TRIM(`Ciclo`) AS UNSIGNED) IN ($ph)";
+        return " AND `Ciclo` IN ($ph)";
     }
     return '';
 }
@@ -112,8 +114,9 @@ foreach ($anomalias as $anomalia) {
         $params = [];
 
         if ($filtro_zona !== '') {
-            $where .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
-            $params[] = (int)$filtro_zona;
+            $where .= " AND `Zona` IN (?, ?)";
+            $params[] = (string)(int)$filtro_zona;
+            $params[] = str_pad((int)$filtro_zona, 2, '0', STR_PAD_LEFT);
         }
         
         if ($anomalia === 'cargas_directas') {

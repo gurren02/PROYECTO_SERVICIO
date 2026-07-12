@@ -192,18 +192,18 @@ $sufijo_comp = $p3_anio . str_pad($p3_mes, 2, '0', STR_PAD_LEFT);
 $nombre_tabla_comp = "estimaciones" . $sufijo_comp;
 
 try {
-    $stmt_z = $pdo->query("SELECT DISTINCT CAST(TRIM(`Zona`) AS UNSIGNED) as z FROM `$nombre_tabla` WHERE `Zona` IS NOT NULL AND `Zona` != ''");
-    while($rz = $stmt_z->fetch(PDO::FETCH_ASSOC)) { $zonas_disponibles[] = (int)$rz['z']; }
+    $stmt_z = $pdo->query("SELECT DISTINCT `Zona` FROM `$nombre_tabla` WHERE `Zona` IS NOT NULL AND `Zona` != ''");
+    while($rz = $stmt_z->fetch(PDO::FETCH_ASSOC)) { $zonas_disponibles[] = (int)trim($rz['Zona']); }
 } catch (PDOException $e) {}
 
 try {
-    $stmt_c = $pdo->query("SELECT DISTINCT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$nombre_tabla` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != ''");
-    while($rc = $stmt_c->fetch(PDO::FETCH_ASSOC)) { $ciclos_actuales[] = (int)$rc['c']; }
+    $stmt_c = $pdo->query("SELECT DISTINCT `Ciclo` FROM `$nombre_tabla` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != ''");
+    while($rc = $stmt_c->fetch(PDO::FETCH_ASSOC)) { $ciclos_actuales[] = (int)trim($rc['Ciclo']); }
 } catch (PDOException $e) {}
 
 try {
-    $stmt_cc = $pdo->query("SELECT DISTINCT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$nombre_tabla_comp` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != ''");
-    while($rc = $stmt_cc->fetch(PDO::FETCH_ASSOC)) { $ciclos_comparacion[] = (int)$rc['c']; }
+    $stmt_cc = $pdo->query("SELECT DISTINCT `Ciclo` FROM `$nombre_tabla_comp` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != ''");
+    while($rc = $stmt_cc->fetch(PDO::FETCH_ASSOC)) { $ciclos_comparacion[] = (int)trim($rc['Ciclo']); }
 } catch (PDOException $e) {}
 
 $zonas_disponibles  = array_unique($zonas_disponibles);  sort($zonas_disponibles);
@@ -246,18 +246,21 @@ try {
     $parametros_sql = [];
 
     if ($filtro_zona !== '')  {
-        $where_sql .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
-        $parametros_sql[] = (int)$filtro_zona;
+        $where_sql .= " AND `Zona` IN (?, ?)";
+        $parametros_sql[] = (string)(int)$filtro_zona;
+        $parametros_sql[] = str_pad((int)$filtro_zona, 2, '0', STR_PAD_LEFT);
     }
-    $where_sql .= " AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))";
+    $where_sql .= " AND NOT (`Zona` IN ('1', '01') AND (`Agencia` IN ('F', 'MOTUL', 'f', 'motul')))";
     if (!empty($filtro_ciclo)) {
         $placeholders = [];
         foreach ($filtro_ciclo as $c) {
-            $parametros_sql[] = (int)$c;
+            $parametros_sql[] = (string)(int)$c;
+            $parametros_sql[] = str_pad((int)$c, 2, '0', STR_PAD_LEFT);
+            $placeholders[] = '?';
             $placeholders[] = '?';
         }
         $ph = implode(',', $placeholders);
-        $where_sql .= " AND CAST(TRIM(`Ciclo`) AS UNSIGNED) IN ($ph)";
+        $where_sql .= " AND `Ciclo` IN ($ph)";
     }
 
     $query = "SELECT UPPER(TRIM(`Agencia`)) as letra_bd, UPPER(TRIM(`Motivo_Estimacion`)) as motivo, COUNT(*) as total 
@@ -412,7 +415,7 @@ if (!empty($filtro_ciclo)) $url_volver .= "&ciclo=" . urlencode(implode(",", $fi
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logo_cf.webp">
     <title>Detalle Estimaciones</title>
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/header.css">

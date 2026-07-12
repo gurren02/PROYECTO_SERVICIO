@@ -122,8 +122,22 @@ function obtenerConteosMapeados($pdo, $nombre_tabla, $conceptos, $ciclo = null) 
     return $conteos;
 }
 
-// Lista de agencias en orden fijo (igual que en api_falsos_procesar.php)
-$agencias_orden = ['ACANCEH', 'CENTRO', 'CONKAL', 'HUNUCMA', 'NORTE', 'ORIENTE', 'PONIENTE', 'PROGRESO', 'SUR', 'UMAN'];
+// Lista de agencias ordenada alfabéticamente por su letra asignada
+$agencias_orden = ['CENTRO', 'NORTE', 'SUR', 'ORIENTE', 'PONIENTE', 'PROGRESO', 'HUNUCMA', 'UMAN', 'ACANCEH', 'CONKAL'];
+
+// Mapa para obtener la letra correspondiente de cada agencia
+$mapa_letras_agencias = [
+    'CENTRO'   => 'A',
+    'NORTE'    => 'B',
+    'SUR'      => 'C',
+    'ORIENTE'  => 'D',
+    'PONIENTE' => 'E',
+    'PROGRESO' => 'G',
+    'HUNUCMA'  => 'H',
+    'UMAN'     => 'J',
+    'ACANCEH'  => 'K',
+    'CONKAL'   => 'M'
+];
 
 // Función para obtener conteos por agencia y concepto
 function obtenerConteosPorAgencia($pdo, $nombre_tabla, $conceptos, $ciclo = null) {
@@ -190,7 +204,7 @@ if ($tabla_actual_existe) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logo_cf.webp">
     <title>CFE - Módulo Falsos</title>
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/subir.css">
@@ -652,11 +666,13 @@ if ($tabla_actual_existe) {
                     <tr>
                         <th class="col-num-h">No.</th>
                         <th class="col-concepto-h">Concepto</th>
-                        <?php foreach ($agencias_orden as $ag): ?>
+                        <?php foreach ($agencias_orden as $ag): 
+                            $letra = $mapa_letras_agencias[$ag] ?? '';
+                        ?>
                             <th class="th-agencia" onclick="abrirModalAgencia('<?php echo htmlspecialchars($ag, ENT_QUOTES); ?>')" title="Ver detalle: <?php echo htmlspecialchars($ag, ENT_QUOTES); ?>">
                                 <div class="ag-btn-inner">
                                     <span><?php echo htmlspecialchars($ag); ?></span>
-                                    <span class="material-symbols-rounded ag-icon">open_in_new</span>
+                                    <span style="font-size: 0.8rem; opacity: 0.85; font-weight: 500;"><?php echo htmlspecialchars($letra); ?></span>
                                 </div>
                             </th>
                         <?php endforeach; ?>
@@ -1315,6 +1331,54 @@ if ($tabla_actual_existe) {
         }
     }
 
+    function toggleSortComments() {
+        const table = document.querySelector('.ea-table--detailed');
+        if (!table) return;
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const arrow = document.getElementById('sort-arrow');
+        if (!arrow) return;
+        
+        let currentState = arrow.dataset.state || 'none'; // 'none', 'asc'
+        let nextState = 'asc';
+        if (currentState === 'asc') {
+            nextState = 'none';
+        }
+        
+        arrow.dataset.state = nextState;
+        
+        if (nextState === 'asc') {
+            arrow.textContent = 'arrow_upward';
+            rows.sort((a, b) => {
+                const dateA = a.dataset.commentDate || '';
+                const dateB = b.dataset.commentDate || '';
+                
+                // Si ninguno tiene fecha de comentario, mantener el orden original relativo
+                if (!dateA && !dateB) {
+                    return parseInt(a.dataset.originalIndex) - parseInt(b.dataset.originalIndex);
+                }
+                // Si solo A tiene comentario, va primero
+                if (dateA && !dateB) return -1;
+                // Si solo B tiene comentario, va primero
+                if (!dateA && dateB) return 1;
+                
+                // Ambos tienen comentarios, ordenar por fecha ascendente
+                return new Date(dateA) - new Date(dateB);
+            });
+        } else {
+            arrow.textContent = 'unfold_more';
+            rows.sort((a, b) => {
+                const idxA = parseInt(a.dataset.originalIndex) || 0;
+                const idxB = parseInt(b.dataset.originalIndex) || 0;
+                return idxA - idxB;
+            });
+        }
+        
+        // Reordenar filas en el DOM
+        rows.forEach(row => tbody.appendChild(row));
+    }
+
     function exportarDetalleCSV() {
         const table = document.querySelector('.ea-table--detailed');
         if (!table) return;
@@ -1801,6 +1865,12 @@ if ($tabla_actual_existe) {
                 if (cellContainer) {
                     cellContainer.dataset.original = data.ultimo_comentario;
                     cellContainer.dataset.latestCommentId = data.id_comentario || 0;
+                }
+                
+                // Actualizar la fecha del comentario en el tr del DOM
+                const row = document.querySelector(`tr[data-id="${id_registro}"]`);
+                if (row) {
+                    row.dataset.commentDate = data.fecha_registro || '';
                 }
                 
                 // Actualizar colores de los iconos dinámicamente

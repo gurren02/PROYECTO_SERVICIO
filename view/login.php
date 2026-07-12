@@ -12,6 +12,9 @@ if (isset($_SESSION['autentificado']) && $_SESSION['autentificado'] === "SI") {
 $mensaje_error = isset($_SESSION['error_login']) ? $_SESSION['error_login'] : '';
 $usuario_previo = isset($_SESSION['usuario_intento']) ? $_SESSION['usuario_intento'] : '';
 
+// Verificar si viene de un cierre de sesión
+$cerro_sesion = isset($_GET['logout']) && $_GET['logout'] === '1';
+
 // Una vez leídos, los borramos para que no aparezcan si el usuario refresca la página
 unset($_SESSION['error_login']);
 unset($_SESSION['usuario_intento']);
@@ -26,20 +29,62 @@ unset($_SESSION['usuario_intento']);
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/login.css">
-    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logo_s.webp">
     <title>INICIAR SESIÓN</title>
 </head>
 <body>
 
-<div class="login-page-wrapper">
-    <div class="contenedor_login-fondo">
-        <div class="contenedor_login">
-            <h3 class="login-titulo">Iniciar sesión</h3>
+<?php if ($cerro_sesion): ?>
+<!-- AVISO PERSONALIZADO DE CIERRE DE SESIÓN -->
+<div class="toast-overlay" id="toastLogout">
+    <div class="toast-card">
+        <div class="toast-card__icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0F4A38" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        </div>
+        <p class="toast-card__title">Sesión cerrada</p>
+        <p class="toast-card__msg">Has cerrado sesión correctamente.<br>¡Hasta pronto!</p>
+        <button class="toast-card__btn" onclick="cerrarToast()">Aceptar</button>
+    </div>
+</div>
+<script>
+function cerrarToast() {
+    var overlay = document.getElementById('toastLogout');
+    if (overlay) overlay.remove();
+}
+// Limpiar el parámetro de la URL inmediatamente para que no se muestre al recargar
+if (typeof window.history.replaceState === 'function') {
+    const url = new URL(window.location);
+    url.searchParams.delete('logout');
+    window.history.replaceState({}, '', url);
+}
+</script>
+<?php endif; ?>
 
-            <div class="login-imagen">
-                <img src="../assets/multimedia/favicon-cfe.svg" alt="loginlogo" class="imagen_log"
-                     onerror="this.outerHTML='<div class=\'logo-placeholder\'>⚡</div>'">
-            </div>
+<div class="login-wrapper">
+
+    <!-- ══════════════════════════════════
+         PANEL IZQUIERDO — Logo y marca
+    ══════════════════════════════════ -->
+    <div class="login-left">
+        <img src="../assets/multimedia/logo_b.webp"
+             alt="Logo SEDEFAC"
+             class="brand-logo"
+             onerror="this.style.display='none'">
+        <img src="../assets/multimedia/t_nc.webp"
+             alt="SEDEFAC"
+             class="brand-title"
+             onerror="this.style.display='none'">
+    </div>
+
+    <!-- ══════════════════════════════════
+         PANEL DERECHO — Formulario verde
+    ══════════════════════════════════ -->
+    <div class="login-right">
+        <div class="login-form-inner">
+
+            <h3 class="login-titulo">Iniciar sesión</h3>
 
             <div class="login-credenciales">
 
@@ -58,37 +103,45 @@ unset($_SESSION['usuario_intento']);
 
                     <legend class="titulo-credenciales">Usuario</legend>
                     <div class="input-wrapper">
-                            <span class="input-icon">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"
-                                     viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path
-                                            d="M2 7l10 7 10-7"/></svg>
-                            </span>
+                        <span class="input-icon">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"
+                                 viewBox="0 0 24 24">
+                                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                                <path d="M2 7l10 7 10-7"/>
+                            </svg>
+                        </span>
                         <input type="text" class="elementologin" placeholder="Usuario" name="userlog"
                                value="<?php echo htmlspecialchars($usuario_previo); ?>" required>
                     </div>
 
                     <legend class="titulo-credenciales">Contraseña</legend>
                     <div class="input-wrapper">
-                            <span class="input-icon">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"
-                                     viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path
-                                            d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            </span>
-                        <input type="password" class="elementologin" placeholder="Contraseña" name="contrasena" id="contrasena" required>
+                        <span class="input-icon">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"
+                                 viewBox="0 0 24 24">
+                                <rect x="3" y="11" width="18" height="11" rx="2"/>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                            </svg>
+                        </span>
+                        <input type="password" class="elementologin" placeholder="Contraseña"
+                               name="contrasena" id="contrasena" required>
                     </div>
 
                     <div class="row-extras">
                         <a href="recuperacion.php" class="link-forgot">¿Olvidaste tu contraseña?</a>
                     </div>
+
                     <button class="btn_login" type="submit" id="btn_login">
                         Iniciar Sesión &nbsp; →
                     </button>
+
                 </form>
             </div>
+
         </div>
     </div>
+
 </div>
 
 </body>
 </html>
-

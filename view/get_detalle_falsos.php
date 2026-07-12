@@ -110,7 +110,7 @@ try {
         try {
             // 1. Obtener los últimos comentarios para cada RPU
             $stmt_last_comms = $pdo->prepare("
-                SELECT c1.rpu, c1.comentario, c1.id
+                SELECT c1.rpu, c1.comentario, c1.id, c1.fecha_registro
                 FROM falsos_comentarios_historial c1
                 INNER JOIN (
                     SELECT rpu, MAX(id) as max_id
@@ -123,6 +123,7 @@ try {
             while ($row_c = $stmt_last_comms->fetch(PDO::FETCH_ASSOC)) {
                 $rpu_ultimo_comentario[$row_c['rpu']] = $row_c['comentario'];
                 $rpu_ultimo_comentario_id[$row_c['rpu']] = (int)$row_c['id'];
+                $rpu_ultimo_comentario_fecha[$row_c['rpu']] = $row_c['fecha_registro'];
             }
 
             // 2. Obtener estado de historial de comentarios y observaciones agrupados por RPU
@@ -287,6 +288,9 @@ try {
             outline-offset: -2.5px;
             background-color: #e0f2fe !important;
         }
+        #th-comentarios:hover {
+            background-color: #095fa0 !important;
+        }
     </style>';
 
     // Tabla con scroll que abarca todo el cuerpo del modal sin paddings ni bordes extra
@@ -294,7 +298,7 @@ try {
     echo '<table class="ea-table ea-table--detailed">';
     echo '<thead><tr class="ea-table__head-cols" style="position: sticky; top: 0; z-index: 1;">';
     echo '<th>RPU</th>';
-    echo '<th>NIS</th>';
+    echo '<th>CUENTA</th>';
     echo '<th>Nombre</th>';
     echo '<th>Dirección</th>';
     echo '<th style="text-align:center;">Tarifa</th>';
@@ -303,18 +307,23 @@ try {
     echo '<th>Anomalía</th>';
     echo '<th style="text-align:center;">Ciclo</th>';
     echo '<th>Agencia</th>';
-    echo '<th>Comentarios</th>';
+    echo '<th id="th-comentarios" style="cursor: pointer; user-select: none;" onclick="toggleSortComments()">';
+    echo '  <span style="vertical-align: middle;">Comentarios</span>';
+    echo '  <span class="material-symbols-rounded" id="sort-arrow" style="font-size: 16px; vertical-align: middle; margin-left: 4px;" data-state="none">unfold_more</span>';
+    echo '</th>';
     echo '</tr></thead><tbody>';
     
+    $row_index = 0;
     foreach ($filas as $fila) {
         $id = (int)$fila['id_registro'];
         $rpu = isset($fila['Rpu']) ? trim($fila['Rpu']) : '';
         $comment = isset($rpu_ultimo_comentario[$rpu]) ? trim($rpu_ultimo_comentario[$rpu]) : '';
         $commentEscaped = htmlspecialchars($comment, ENT_QUOTES, 'UTF-8');
+        $comment_fecha = isset($rpu_ultimo_comentario_fecha[$rpu]) ? $rpu_ultimo_comentario_fecha[$rpu] : '';
 
         $lastObs = isset($rpu_ultima_observacion[$rpu]) ? $rpu_ultima_observacion[$rpu] : '';
         $lastObsEscaped = htmlspecialchars($lastObs, ENT_QUOTES, 'UTF-8');
-        echo '<tr data-id="' . $id . '" data-last-obs="' . $lastObsEscaped . '">';
+        echo '<tr data-id="' . $id . '" data-last-obs="' . $lastObsEscaped . '" data-comment-date="' . $comment_fecha . '" data-original-index="' . $row_index . '">';
         echo '<td style="font-family: monospace;">' . htmlspecialchars($fila['Rpu'] ?? '-') . '</td>';
         echo '<td>' . htmlspecialchars($fila['Nis'] ?? '-') . '</td>';
         echo '<td style="font-weight: 500;">' . htmlspecialchars($fila['Nombre'] ?? '-') . '</td>';
@@ -351,6 +360,7 @@ try {
         echo '</td>';
 
         echo '</tr>';
+        $row_index++;
     }
     echo '</tbody></table></div>';
     

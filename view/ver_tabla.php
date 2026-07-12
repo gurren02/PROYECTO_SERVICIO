@@ -41,15 +41,15 @@ try {
         $tiene_ciclo = in_array('Ciclo', $columnas);
 
         if ($tiene_zona) {
-            $stmt_z = $pdo->query("SELECT DISTINCT CAST(TRIM(`Zona`) AS UNSIGNED) as z FROM `$nombre_tabla` WHERE `Zona` IS NOT NULL AND `Zona` != ''");
-            while($rz = $stmt_z->fetch(PDO::FETCH_ASSOC)) { $zonas_disponibles[] = (int)$rz['z']; }
+            $stmt_z = $pdo->query("SELECT DISTINCT `Zona` FROM `$nombre_tabla` WHERE `Zona` IS NOT NULL AND `Zona` != ''");
+            while($rz = $stmt_z->fetch(PDO::FETCH_ASSOC)) { $zonas_disponibles[] = (int)trim($rz['Zona']); }
             $zonas_disponibles = array_unique($zonas_disponibles);
             sort($zonas_disponibles);
         }
 
         if ($tiene_ciclo) {
-            $stmt_c = $pdo->query("SELECT DISTINCT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$nombre_tabla` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != ''");
-            while($rc = $stmt_c->fetch(PDO::FETCH_ASSOC)) { $ciclos_disponibles[] = (int)$rc['c']; }
+            $stmt_c = $pdo->query("SELECT DISTINCT `Ciclo` FROM `$nombre_tabla` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != ''");
+            while($rc = $stmt_c->fetch(PDO::FETCH_ASSOC)) { $ciclos_disponibles[] = (int)trim($rc['Ciclo']); }
             $ciclos_disponibles = array_unique($ciclos_disponibles);
             sort($ciclos_disponibles);
         }
@@ -58,12 +58,14 @@ try {
         $params = [];
 
         if ($tiene_zona && $filtro_zona !== '') {
-            $where .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
-            $params[] = (int)$filtro_zona;
+            $where .= " AND `Zona` IN (?, ?)";
+            $params[] = (string)(int)$filtro_zona;
+            $params[] = str_pad((int)$filtro_zona, 2, '0', STR_PAD_LEFT);
         }
         if ($tiene_ciclo && $filtro_ciclo !== '') {
-            $where .= " AND CAST(TRIM(`Ciclo`) AS UNSIGNED) = ?";
-            $params[] = (int)$filtro_ciclo;
+            $where .= " AND `Ciclo` IN (?, ?)";
+            $params[] = (string)(int)$filtro_ciclo;
+            $params[] = str_pad((int)$filtro_ciclo, 2, '0', STR_PAD_LEFT);
         }
 
         // Obtener total de registros (con filtros aplicados)
@@ -87,7 +89,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logo_cf.webp">
     <title>TABLA - <?php echo htmlspecialchars($titulo_mostrar); ?></title>
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/ejecutar_analisis.css">

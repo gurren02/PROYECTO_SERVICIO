@@ -47,10 +47,16 @@ if ($action === 'init') {
     }
 
     $columnas_sql = [];
+    $columnas_a_indexar = [];
     foreach ($headers as $index => $header) {
         $col_name = preg_replace('/[^a-zA-Z0-9_]/', '_', trim($header));
         if (empty($col_name)) { $col_name = "columna_" . $index; }
-        $columnas_sql[] = "`$col_name` TEXT";
+        $columnas_sql[] = "`$col_name` VARCHAR(255) DEFAULT NULL";
+        
+        $col_upper = strtoupper($col_name);
+        if (in_array($col_upper, ['ZONA', 'CICLO', 'AGENCIA', 'RPU'])) {
+            $columnas_a_indexar[] = $col_name;
+        }
     }
 
     $mes_formateado = str_pad($mes, 2, "0", STR_PAD_LEFT);
@@ -65,6 +71,11 @@ if ($action === 'init') {
                 " . implode(", ", $columnas_sql) . "
             )";
         $pdo->exec($create_table_query);
+
+        // Crear índices para optimizar búsquedas y agrupaciones
+        foreach ($columnas_a_indexar as $col) {
+            $pdo->exec("ALTER TABLE `$nombre_tabla` ADD INDEX `idx_" . strtolower($col) . "` (`$col`)");
+        }
     } catch (PDOException $e) {
         unlink($ruta_final);
         echo json_encode(['error' => 'Error al crear tabla dinámica: ' . $e->getMessage()]); exit;
@@ -123,7 +134,8 @@ if ($action === 'process_chunk') {
     // Procesamos hasta llegar al Límite
     while ($filas_procesadas < $limit && ($data = fgetcsv($handle, 10000, ",")) !== FALSE) {
         if (count($data) === count($columnas_limpias)) {
-            $params = array_merge([$anio, $mes], $data);
+            $trimmed_data = array_map('trim', $data);
+            $params = array_merge([$anio, $mes], $trimmed_data);
             $stmt->execute($params);
             $filas_procesadas++;
         }

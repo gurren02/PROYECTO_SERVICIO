@@ -14,7 +14,7 @@ include "../src/seguridad.php";
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/index.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logo_cf.webp">
     <title>SEDEFAC — Seguimiento a los Defectos de la Facturación</title>
 </head>
 <body>
@@ -26,8 +26,8 @@ include "../src/seguridad.php";
 
     <div class="idx-welcome">
         <div class="idx-welcome__brand">
-            <img src="../assets/multimedia/logo_sedefac.webp" alt="Logo SEDEFAC" class="idx-welcome__brand-logo">
-            <img src="../assets/multimedia/titulocompleto_sedefac.webp" alt="SEDEFAC — Seguimiento a los Defectos de la Facturación" class="idx-welcome__brand-title">
+            <img src="../assets/multimedia/logo_s.webp" alt="Logo SEDEFAC" class="idx-welcome__brand-logo">
+            <img src="../assets/multimedia/t_c.webp" alt="SEDEFAC — Seguimiento a los Defectos de la Facturación" class="idx-welcome__brand-title">
         </div>
         <span class="idx-welcome__date" id="idx-date"></span>
     </div>
@@ -79,8 +79,8 @@ include "../src/seguridad.php";
             <span class="material-symbols-rounded idx-card__arrow">arrow_forward</span>
         </a>
 
-        <!-- USUARIOS (solo admin) -->
-        <?php if (isset($_SESSION['rol']) && $_SESSION['rol'] === 'admin'): ?>
+        <!-- USUARIOS (admin y oficinista) -->
+        <?php if (isset($_SESSION['rol']) && in_array($_SESSION['rol'], ['admin', 'oficinista'])): ?>
         <a href="usuarios.php" class="idx-card idx-card--users">
             <div class="idx-card__bg"></div>
             <div class="idx-card__overlay"></div>

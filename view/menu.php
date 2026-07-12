@@ -6,8 +6,8 @@
     <!-- Cabecera: logo CFE + botón toggle -->
     <div class="sidebar__head">
         <div class="sidebar__logo">
-            <img src="../assets/multimedia/logoblanco_sedefac.webp" alt="Logo SEDEFAC" class="sidebar__logo-img sidebar__logo-icon">
-            <img src="../assets/multimedia/titulonegativo_sedefac.webp" alt="SEDEFAC" class="sidebar__logo-img sidebar__logo-text">
+            <img src="../assets/multimedia/logo_b.webp" alt="Logo SEDEFAC" class="sidebar__logo-img sidebar__logo-icon">
+            <img src="../assets/multimedia/t_n.webp" alt="SEDEFAC" class="sidebar__logo-img sidebar__logo-text">
         </div>
         <button class="sidebar__toggle" id="sidebarToggle" onclick="toggleSidebar()" aria-label="Toggle menú">
             <span class="material-symbols-rounded" id="sidebarToggleIcon">chevron_left</span>
@@ -62,7 +62,7 @@
             </div>
         </div>
 
-        <?php if (isset($_SESSION['rol']) && $_SESSION['rol'] === 'admin'): ?>
+        <?php if (isset($_SESSION['rol']) && in_array($_SESSION['rol'], ['admin', 'oficinista'])): ?>
         <a href="usuarios.php"
            class="sidebar__item <?php echo ($pagina_actual==='usuarios.php') ? 'sidebar__item--active' : ''; ?>"
            data-label="Usuarios">

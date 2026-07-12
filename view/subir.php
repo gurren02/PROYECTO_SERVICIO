@@ -17,7 +17,7 @@ include "../src/seguridad.php";
     <link rel="stylesheet" href="../assets/ejecutar_analisis.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <script src="../assets/script.js"></script>
-    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logo_cf.webp">
     <title>SUBIR ARCHIVOS</title>
 </head>
 <body>
@@ -138,7 +138,6 @@ include "../src/seguridad.php";
             </div>
             <div class="subir-modal__body">
                 <p class="subir-modal__desc" id="falsos-subir-modal-desc">Se detectaron los siguientes periodos. Corrige si hay algún error antes de cargar.</p>
-                <div id="falsos-modal-alert-container"></div>
                 <div class="subir-modal__list" id="falsos-modal-files-list">
                     <!-- Se poblará dinámicamente -->
                 </div>
@@ -150,29 +149,7 @@ include "../src/seguridad.php";
         </div>
     </div>
 
-    <!-- Modal de Advertencia de Paridad de Ciclo/Mes (Falsos) -->
-    <div id="falsos-parity-warning-modal" class="subir-modal" style="z-index: 1200;">
-        <div class="subir-modal__content" style="max-width: 500px; margin: 12% auto; border-radius: 12px; overflow: hidden; border: 1px solid #fde68a;">
-            <div class="subir-modal__header" style="background: linear-gradient(135deg, #d97706, #ca8a04); padding: 14px 20px; border-bottom: none;">
-                <h3 style="margin: 0; color: #fff; font-size: 1.15rem; font-weight: 700; display:flex; align-items:center; gap:8px;">
-                    <span class="material-symbols-rounded" style="color: white; font-size: 24px;">warning</span>
-                    Inconsistencia de Ciclo/Mes
-                </h3>
-            </div>
-            <div class="subir-modal__body" style="padding: 20px; background-color: #ffffff; display: flex; flex-direction: column; gap: 14px;">
-                <div style="background-color: #fffbeb; border-left: 4px solid #d97706; padding: 12px 14px; border-radius: 4px;">
-                    <p id="falsos-parity-warning-text" style="margin: 0; font-size: 0.95rem; color: #92400e; line-height: 1.5; font-weight: 600;"></p>
-                </div>
-                <p style="margin: 0; font-size: 0.9rem; color: #475569; line-height: 1.4; font-weight: 500;">
-                    El ciclo extraído de este archivo no coincide con la paridad del mes seleccionado.
-                </p>
-            </div>
-            <div class="subir-modal__footer" style="padding: 14px 20px; background-color: #f8fafc; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" class="subir-btn" id="btn-parity-keep-manual" style="background-color: #e2e8f0; color: #475569; border: 1px solid #cbd5e1; font-weight: 600; font-size: 0.88rem; cursor:pointer;" onclick="resolverInconsistenciaParidad(false)"></button>
-                <button type="button" class="subir-btn" id="btn-parity-accept-auto" style="background-color: #ca8a04; color: #ffffff; font-weight: 600; font-size: 0.88rem; cursor:pointer;" onclick="resolverInconsistenciaParidad(true)"></button>
-            </div>
-        </div>
-    </div>
+
 
     <!-- Modal de Historial de Archivos Cargados (Falsos) -->
     <div id="ea-historial-modal" class="ea-modal" onclick="if(event.target===this)cerrarModalHistorial()">
@@ -708,18 +685,13 @@ include "../src/seguridad.php";
         });
     }
 
-    let parityInconsistencyQueue = [];
-    let currentInconsistencyItem = null;
-
     function iniciarValidacionParidad() {
-        parityInconsistencyQueue = [];
         const monthsObj = {1:'Enero',2:'Febrero',3:'Marzo',4:'Abril',5:'Mayo',6:'Junio',7:'Julio',8:'Agosto',9:'Septiembre',10:'Octubre',11:'Noviembre',12:'Diciembre'};
 
         selectedTxtFiles.forEach(fileInfo => {
-            // Ignorar si el usuario forzó explícitamente el mes incorrecto para este archivo
-            if (fileInfo.forzarIncorrecto) return;
-
             const cycle = fileInfo.detectedCycle;
+            const warningEl = document.getElementById(`parity-warning-txt-${fileInfo.id}`);
+            
             if (cycle !== undefined && cycle !== null) {
                 const cycleIsEven = (cycle % 2 === 0);
                 const monthIsEven = (parseInt(fileInfo.mes, 10) % 2 === 0);
@@ -729,112 +701,29 @@ include "../src/seguridad.php";
                     const suggestedMonth = (parseInt(fileInfo.mes, 10) % 12) + 1;
                     const suggestedMonthName = monthsObj[suggestedMonth];
                     
-                    parityInconsistencyQueue.push({
-                        fileInfo: fileInfo,
-                        cycle: cycle,
-                        origMonthName: origMonthName,
-                        suggestedMonth: suggestedMonth,
-                        suggestedMonthName: suggestedMonthName
-                    });
-                }
-            }
-        });
-        
-        procesarSiguienteInconsistencia();
-    }
-
-    function procesarSiguienteInconsistencia() {
-        if (parityInconsistencyQueue.length === 0) {
-            renderBannersInformativos();
-            return;
-        }
-        
-        currentInconsistencyItem = parityInconsistencyQueue.shift();
-        
-        const warningModal = document.getElementById('falsos-parity-warning-modal');
-        const warningText = document.getElementById('falsos-parity-warning-text');
-        
-        warningText.innerHTML = `<strong>${currentInconsistencyItem.fileInfo.original}</strong>:<br>Ciclo ${currentInconsistencyItem.cycle} no corresponde a ${currentInconsistencyItem.origMonthName}.`;
-        
-        document.getElementById('btn-parity-keep-manual').innerText = `Mantener ${currentInconsistencyItem.origMonthName} (Manual)`;
-        document.getElementById('btn-parity-accept-auto').innerText = `Aceptar ${currentInconsistencyItem.suggestedMonthName} (Auto)`;
-        
-        warningModal.classList.add('active');
-    }
-
-    function resolverInconsistenciaParidad(aceptarSugerido) {
-        const warningModal = document.getElementById('falsos-parity-warning-modal');
-        warningModal.classList.remove('active');
-        
-        if (currentInconsistencyItem) {
-            const fileInfo = currentInconsistencyItem.fileInfo;
-            if (aceptarSugerido) {
-                const suggestedMonth = currentInconsistencyItem.suggestedMonth;
-                fileInfo.mes = suggestedMonth;
-                
-                const selectEl = document.querySelector(`.modal-mes-txt[data-id="${fileInfo.id}"]`);
-                if (selectEl) {
-                    selectEl.value = suggestedMonth;
+                    if (warningEl) {
+                        warningEl.innerHTML = `
+                            <span class="material-symbols-rounded" style="color:#d97706; font-size:18px; flex-shrink:0;">warning</span>
+                            <div style="flex-grow:1; line-height:1.4;">Ciclo ${cycle} no corresponde a ${origMonthName}. Mes sugerido: <strong>${suggestedMonthName}</strong>.</div>
+                            <button type="button" class="btn-sugerido-auto" data-id="${fileInfo.id}" data-sugerido="${suggestedMonth}" style="flex-shrink:0; background-color:#ca8a04; color:#ffffff; font-weight:600; font-size:0.75rem; padding:6px 10px; border-radius:4px; border:none; cursor:pointer; display:flex; align-items:center; gap:4px; transition: background-color 0.2s;">
+                                Cambiar a ${suggestedMonthName}
+                            </button>
+                        `;
+                        warningEl.style.display = 'flex';
+                    }
+                } else {
+                    if (warningEl) {
+                        warningEl.style.display = 'none';
+                        warningEl.innerHTML = '';
+                    }
                 }
             } else {
-                fileInfo.forzarIncorrecto = true;
-            }
-        }
-        
-        currentInconsistencyItem = null;
-        procesarSiguienteInconsistencia();
-    }
-
-    function renderBannersInformativos() {
-        const modalAlertContainer = document.getElementById('falsos-modal-alert-container');
-        if (!modalAlertContainer) return;
-        
-        modalAlertContainer.innerHTML = '';
-        
-        let messages = [];
-        const monthsObj = {1:'Enero',2:'Febrero',3:'Marzo',4:'Abril',5:'Mayo',6:'Junio',7:'Julio',8:'Agosto',9:'Septiembre',10:'Octubre',11:'Noviembre',12:'Diciembre'};
-
-        selectedTxtFiles.forEach(fileInfo => {
-            const cycle = fileInfo.detectedCycle;
-            if (cycle !== undefined && cycle !== null) {
-                const cycleIsEven = (cycle % 2 === 0);
-                const monthIsEven = (parseInt(fileInfo.mes, 10) % 2 === 0);
-                
-                if (cycleIsEven !== monthIsEven) {
-                    const origMonthName = monthsObj[fileInfo.mes] || fileInfo.mes;
-                    messages.push({
-                        type: 'danger',
-                        text: `<strong>${fileInfo.original}</strong>: Ciclo ${cycle} no corresponde a ${origMonthName} (Carga forzada manualmente).`
-                    });
-                } else if (fileInfo.mes !== fileInfo.originalMes) {
-                    const origMonthName = monthsObj[fileInfo.originalMes] || fileInfo.originalMes;
-                    const selectedMonthName = monthsObj[fileInfo.mes] || fileInfo.mes;
-                    messages.push({
-                        type: 'info',
-                        text: `<strong>${fileInfo.original}</strong>: Ajustado de ${origMonthName} a ${selectedMonthName} por ciclo ${cycle}.`
-                    });
+                if (warningEl) {
+                    warningEl.style.display = 'none';
+                    warningEl.innerHTML = '';
                 }
             }
         });
-        
-        if (messages.length > 0) {
-            let html = `
-                <div class="subir-alert subir-alert--warning" style="background-color: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #d97706; padding: 12px 16px; border-radius: 6px; color: #92400e; margin-bottom: 15px; display: flex; flex-direction: column; gap: 6px;">
-                    <div style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:0.92rem;">
-                        <span class="material-symbols-rounded" style="color:#d97706; font-size:18px;">warning</span>
-                        Resumen de Consistencia (Ciclo/Mes)
-                    </div>
-                    <ul style="margin: 0; padding-left: 20px; font-size:0.88rem; line-height: 1.4; display:flex; flex-direction:column; gap:3px;">
-            `;
-            messages.forEach(m => {
-                html += `<li>${m.text}</li>`;
-            });
-            html += `
-                    </ul>
-                </div>
-            `;
-            modalAlertContainer.innerHTML = html;
-        }
     }
 
     function parseFalsosFilename(filename) {
@@ -957,7 +846,24 @@ include "../src/seguridad.php";
             const fn = selectedTxtFiles.find(f => f.id === id);
             if (fn) {
                 fn.mes = parseInt(e.target.value, 10);
-                fn.forzarIncorrecto = false; // Resetear la forzada manual al cambiar
+                iniciarValidacionParidad();
+            }
+        }
+    });
+
+    // Escuchar clicks en el botón de aceptar mes sugerido en la tarjeta
+    txtListContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-sugerido-auto');
+        if (btn) {
+            const id = parseInt(btn.dataset.id, 10);
+            const suggestedMonth = parseInt(btn.dataset.sugerido, 10);
+            const fn = selectedTxtFiles.find(f => f.id === id);
+            if (fn) {
+                fn.mes = suggestedMonth;
+                const selectEl = document.querySelector(`.modal-mes-txt[data-id="${id}"]`);
+                if (selectEl) {
+                    selectEl.value = suggestedMonth;
+                }
                 iniciarValidacionParidad();
             }
         }
@@ -993,6 +899,8 @@ include "../src/seguridad.php";
                         <div class="m-progress-fill" id="progress-fill-txt-${fileInfo.id}"></div>
                     </div>
                     <div class="m-progress-text" id="progress-text-txt-${fileInfo.id}">0%</div>
+                </div>
+                <div class="m-parity-warning" id="parity-warning-txt-${fileInfo.id}" style="display:none; margin-top:10px; padding:10px 12px; background-color:#fffbeb; border:1px solid #fde68a; border-left:4px solid #d97706; border-radius:6px; font-size:0.85rem; color:#92400e; font-weight:500; align-items:center; gap:8px;">
                 </div>
             `;
             txtListContainer.appendChild(item);

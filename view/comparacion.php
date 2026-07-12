@@ -144,9 +144,9 @@ foreach ($anomalias as $anomalia) {
     $nombre_tabla_act = $anomalia . $sufijo_actual;
     if (isset($todas_las_tablas[$nombre_tabla_act])) {
         try {
-            $stmt_z = $pdo->query("SELECT DISTINCT CAST(TRIM(`Zona`) AS UNSIGNED) as z FROM `$nombre_tabla_act` WHERE `Zona` IS NOT NULL AND `Zona` != ''");
+            $stmt_z = $pdo->query("SELECT DISTINCT `Zona` FROM `$nombre_tabla_act` WHERE `Zona` IS NOT NULL AND `Zona` != ''");
             while ($rz = $stmt_z->fetch(PDO::FETCH_ASSOC)) {
-                $zonas_disponibles[] = (int)$rz['z'];
+                $zonas_disponibles[] = (int)trim($rz['Zona']);
             }
         } catch (PDOException $e) {}
     }
@@ -172,10 +172,14 @@ foreach ($_sufijos_mapa as $_sufijo_mapa) {
         $_tabla_mapa = $_anom_mapa . $_sufijo_mapa;
         if (!isset($todas_las_tablas[$_tabla_mapa])) continue;
         try {
-            $_stmt_mapa = $pdo->query("SELECT DISTINCT CAST(TRIM(`Zona`) AS UNSIGNED) as z, CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$_tabla_mapa` WHERE `Zona` IS NOT NULL AND `Zona` != '' AND `Ciclo` IS NOT NULL AND `Ciclo` != '' AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))");
+            $_stmt_mapa = $pdo->query("SELECT DISTINCT `Zona`, `Ciclo`, `Agencia` FROM `$_tabla_mapa` WHERE `Zona` IS NOT NULL AND `Zona` != '' AND `Ciclo` IS NOT NULL AND `Ciclo` != ''");
             while ($_r = $_stmt_mapa->fetch(PDO::FETCH_ASSOC)) {
-                $_z = (int)$_r['z'];
-                $_c = (int)$_r['c'];
+                $_z = (int)trim($_r['Zona']);
+                $_c = (int)trim($_r['Ciclo']);
+                $_a = strtoupper(trim($_r['Agencia']));
+                if ($_z === 1 && ($_a === 'F' || $_a === 'MOTUL')) {
+                    continue;
+                }
                 if (!isset($ciclos_por_zona[$_z])) $ciclos_por_zona[$_z] = [];
                 $ciclos_por_zona[$_z][$_c] = true;
             }
@@ -196,11 +200,14 @@ foreach ($_sufijos_mapa as $_sufijo_mapa) {
         $_tabla_mapa = $_anom_mapa . $_sufijo_mapa;
         if (!isset($todas_las_tablas[$_tabla_mapa])) continue;
         try {
-            $_stmt_mapa2 = $pdo->query("SELECT DISTINCT CAST(TRIM(`Zona`) AS UNSIGNED) as z, UPPER(TRIM(`Agencia`)) as ag, CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$_tabla_mapa` WHERE `Zona` IS NOT NULL AND `Zona` != '' AND `Agencia` IS NOT NULL AND `Agencia` != '' AND `Ciclo` IS NOT NULL AND `Ciclo` != '' AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))");
+            $_stmt_mapa2 = $pdo->query("SELECT DISTINCT `Zona`, `Agencia`, `Ciclo` FROM `$_tabla_mapa` WHERE `Zona` IS NOT NULL AND `Zona` != '' AND `Agencia` IS NOT NULL AND `Agencia` != '' AND `Ciclo` IS NOT NULL AND `Ciclo` != ''");
             while ($_r = $_stmt_mapa2->fetch(PDO::FETCH_ASSOC)) {
-                $_z  = (int)$_r['z'];
-                $_ag = $_r['ag'];
-                $_c  = (int)$_r['c'];
+                $_z  = (int)trim($_r['Zona']);
+                $_ag = strtoupper(trim($_r['Agencia']));
+                $_c  = (int)trim($_r['Ciclo']);
+                if ($_z === 1 && ($_ag === 'F' || $_ag === 'MOTUL')) {
+                    continue;
+                }
                 // Indexado por zona
                 if (!isset($ciclos_por_zona_agencia[$_z]))        $ciclos_por_zona_agencia[$_z] = [];
                 if (!isset($ciclos_por_zona_agencia[$_z][$_ag]))  $ciclos_por_zona_agencia[$_z][$_ag] = [];
@@ -247,14 +254,15 @@ if ($busqueda_activa) {
             $params[] = $filtro_agencia;
         }
         if (strpos($tabla, 'cargas_directas') === 0) {
-            $where_clauses[] = "CAST(TRIM(`Zona`) AS UNSIGNED) = 1";
+            $where_clauses[] = "`Zona` IN ('1', '01')";
         } else {
             if ($filtro_zona !== '') {
-                $where_clauses[] = "CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
-                $params[] = (int)$filtro_zona;
+                $where_clauses[] = "`Zona` IN (?, ?)";
+                $params[] = (string)(int)$filtro_zona;
+                $params[] = str_pad((int)$filtro_zona, 2, '0', STR_PAD_LEFT);
             }
         }
-        $where_clauses[] = "NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))";
+        $where_clauses[] = "NOT (`Zona` IN ('1', '01') AND (`Agencia` IN ('F', 'MOTUL', 'f', 'motul')))";
         return empty($where_clauses) ? "" : " WHERE " . implode(" AND ", $where_clauses);
     };
 
@@ -263,24 +271,37 @@ if ($busqueda_activa) {
     $build_cycle_where = function($tabla, &$params) {
         $where_clauses = ["`Ciclo` IS NOT NULL AND `Ciclo` != ''"];
         if (strpos($tabla, 'cargas_directas') === 0) {
-            $where_clauses[] = "CAST(TRIM(`Zona`) AS UNSIGNED) = 1";
+            $where_clauses[] = "`Zona` IN ('1', '01')";
         }
-        $where_clauses[] = "NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))";
+        $where_clauses[] = "NOT (`Zona` IN ('1', '01') AND (`Agencia` IN ('F', 'MOTUL', 'f', 'motul')))";
         return " WHERE " . implode(" AND ", $where_clauses);
     };
 
     $ciclos_actuales_crudos = [];
-    $ciclos_comparacion_crudos = [];
+    $zonas_disponibles  = [];
+    foreach ($anomalias as $anomalia) {
+        $nombre_tabla_act = $anomalia . $sufijo_actual;
+        if (isset($todas_las_tablas[$nombre_tabla_act])) {
+            try {
+                $stmt_z = $pdo->query("SELECT DISTINCT `Zona` FROM `$nombre_tabla_act` WHERE `Zona` IS NOT NULL AND `Zona` != ''");
+                while ($rz = $stmt_z->fetch(PDO::FETCH_ASSOC)) {
+                    $zonas_disponibles[] = (int)trim($rz['Zona']);
+                }
+            } catch (PDOException $e) {}
+        }
+    }
+    $zonas_disponibles = array_unique($zonas_disponibles);
+    sort($zonas_disponibles);
     foreach ($anomalias as $anomalia) {
         $nombre_tabla_act = $anomalia . $sufijo_actual;
         if (isset($todas_las_tablas[$nombre_tabla_act])) {
             try {
                 $p_act = [];
                 $w_act = $build_cycle_where($nombre_tabla_act, $p_act);
-                $stmt = $pdo->prepare("SELECT DISTINCT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$nombre_tabla_act` $w_act");
+                $stmt = $pdo->prepare("SELECT DISTINCT `Ciclo` FROM `$nombre_tabla_act` $w_act");
                 $stmt->execute($p_act);
                 while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                    $ciclos_actuales_crudos[] = (int)$r['c'];
+                    $ciclos_actuales_crudos[] = (int)trim($r['Ciclo']);
                 }
             } catch (PDOException $e) {}
         }
@@ -290,10 +311,10 @@ if ($busqueda_activa) {
             try {
                 $p_comp = [];
                 $w_comp = $build_cycle_where($nombre_tabla_comp, $p_comp);
-                $stmt = $pdo->prepare("SELECT DISTINCT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$nombre_tabla_comp` $w_comp");
+                $stmt = $pdo->prepare("SELECT DISTINCT `Ciclo` FROM `$nombre_tabla_comp` $w_comp");
                 $stmt->execute($p_comp);
                 while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                    $ciclos_comparacion_crudos[] = (int)$r['c'];
+                    $ciclos_comparacion_crudos[] = (int)trim($r['Ciclo']);
                 }
             } catch (PDOException $e) {}
         }
@@ -323,9 +344,9 @@ if ($busqueda_activa) {
     $tabla_estimaciones_actual = 'estimaciones' . $sufijo_actual;
     if (isset($todas_las_tablas[$tabla_estimaciones_actual])) {
         try {
-            $stmt_cnt = $pdo->query("SELECT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c, COUNT(*) as cnt FROM `$tabla_estimaciones_actual` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != '' GROUP BY c");
+            $stmt_cnt = $pdo->query("SELECT `Ciclo`, COUNT(*) as cnt FROM `$tabla_estimaciones_actual` WHERE `Ciclo` IS NOT NULL AND `Ciclo` != '' GROUP BY `Ciclo`");
             while ($r = $stmt_cnt->fetch(PDO::FETCH_ASSOC)) {
-                $c_val = (int)$r['c'];
+                $c_val = (int)trim($r['Ciclo']);
                 $cnt_val = (int)$r['cnt'];
                 $conteos_por_ciclo[$c_val] = $cnt_val;
             }
@@ -355,7 +376,7 @@ if ($busqueda_activa) {
         $tabla_cd_actual = 'cargas_directas' . $sufijo_actual;
         if (isset($todas_las_tablas[$tabla_cd_actual])) {
             try {
-                $stmt_cd_check = $pdo->prepare("SELECT COUNT(*) FROM `$tabla_cd_actual` WHERE CAST(TRIM(`Ciclo`) AS UNSIGNED) = 80");
+                $stmt_cd_check = $pdo->prepare("SELECT COUNT(*) FROM `$tabla_cd_actual` WHERE `Ciclo` = '80'");
                 $stmt_cd_check->execute();
                 if ((int)$stmt_cd_check->fetchColumn() > 0) {
                     if (!in_array(80, $ciclos_actuales_filtrados)) {
@@ -377,14 +398,15 @@ if ($busqueda_activa) {
             $where_clauses = ["`Ciclo` IS NOT NULL AND `Ciclo` != ''", "UPPER(TRIM(`Agencia`)) = ?"];
             $params[] = $filtro_agencia;
             if (strpos($tabla, 'cargas_directas') === 0) {
-                $where_clauses[] = "CAST(TRIM(`Zona`) AS UNSIGNED) = 1";
+                $where_clauses[] = "`Zona` IN ('1', '01')";
             } else {
                 if ($filtro_zona !== '') {
-                    $where_clauses[] = "CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
-                    $params[] = (int)$filtro_zona;
+                    $where_clauses[] = "`Zona` IN (?, ?)";
+                    $params[] = (string)(int)$filtro_zona;
+                    $params[] = str_pad((int)$filtro_zona, 2, '0', STR_PAD_LEFT);
                 }
             }
-            $where_clauses[] = "NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))";
+            $where_clauses[] = "NOT (`Zona` IN ('1', '01') AND (`Agencia` IN ('F', 'MOTUL', 'f', 'motul')))";
             return " WHERE " . implode(" AND ", $where_clauses);
         };
 
@@ -394,10 +416,10 @@ if ($busqueda_activa) {
                 try {
                     $p_act = [];
                     $w_act = $build_agency_cycle_where($nombre_tabla_act, $p_act);
-                    $stmt = $pdo->prepare("SELECT DISTINCT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$nombre_tabla_act` $w_act");
+                    $stmt = $pdo->prepare("SELECT DISTINCT `Ciclo` FROM `$nombre_tabla_act` $w_act");
                     $stmt->execute($p_act);
                     while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                        $ciclos_con_datos_agencia[] = (int)$r['c'];
+                        $ciclos_con_datos_agencia[] = (int)trim($r['Ciclo']);
                     }
                 } catch (PDOException $e) {}
             }
@@ -407,10 +429,10 @@ if ($busqueda_activa) {
                 try {
                     $p_comp = [];
                     $w_comp = $build_agency_cycle_where($nombre_tabla_comp, $p_comp);
-                    $stmt = $pdo->prepare("SELECT DISTINCT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c FROM `$nombre_tabla_comp` $w_comp");
+                    $stmt = $pdo->prepare("SELECT DISTINCT `Ciclo` FROM `$nombre_tabla_comp` $w_comp");
                     $stmt->execute($p_comp);
                     while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                        $ciclos_con_datos_agencia[] = (int)$r['c'];
+                        $ciclos_con_datos_agencia[] = (int)trim($r['Ciclo']);
                     }
                 } catch (PDOException $e) {}
             }
@@ -480,10 +502,10 @@ if ($busqueda_activa) {
                 try {
                     $p_counts_act = [];
                     $w_counts_act = $build_where($nombre_tabla, $p_counts_act);
-                    $stmt = $pdo->prepare("SELECT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c, COUNT(*) as cnt FROM `$nombre_tabla` $w_counts_act GROUP BY TRIM(`Ciclo`)");
+                    $stmt = $pdo->prepare("SELECT `Ciclo`, COUNT(*) as cnt FROM `$nombre_tabla` $w_counts_act GROUP BY `Ciclo`");
                     $stmt->execute($p_counts_act);
                     while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                        $counts_actual[$anomalia][(int)$r['c']] = (int)$r['cnt'];
+                        $counts_actual[$anomalia][(int)trim($r['Ciclo'])] = (int)$r['cnt'];
                     }
                 } catch (PDOException $e) {}
             }
@@ -498,10 +520,10 @@ if ($busqueda_activa) {
                 try {
                     $p_counts_comp = [];
                     $w_counts_comp = $build_where($nombre_tabla, $p_counts_comp);
-                    $stmt = $pdo->prepare("SELECT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c, COUNT(*) as cnt FROM `$nombre_tabla` $w_counts_comp GROUP BY TRIM(`Ciclo`)");
+                    $stmt = $pdo->prepare("SELECT `Ciclo`, COUNT(*) as cnt FROM `$nombre_tabla` $w_counts_comp GROUP BY `Ciclo`");
                     $stmt->execute($p_counts_comp);
                     while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                        $counts_comp[$anomalia][(int)$r['c']] = (int)$r['cnt'];
+                        $counts_comp[$anomalia][(int)trim($r['Ciclo'])] = (int)$r['cnt'];
                     }
                 } catch (PDOException $e) {}
             }
@@ -589,6 +611,66 @@ if ($busqueda_activa) {
     // 6. Ranking de peor aumento por agencia (siempre, independiente del filtro)
     // Pre-calcular ranking para todas las anomalías y para la opción "default" (excluyendo estimaciones y consumos_cero)
     if (!empty($ciclos_actuales)) {
+        // Pre-cargar todos los conteos agrupados por Agencia y Ciclo para evitar N+1 queries
+        $counts_actual_por_agencia = [];
+        $counts_comp_por_agencia = [];
+
+        foreach ($anomalias as $anomalia) {
+            $counts_actual_por_agencia[$anomalia] = [];
+            $counts_comp_por_agencia[$anomalia] = [];
+
+            $tabla_act  = $anomalia . $sufijo_actual;
+            $tabla_comp = $anomalia . $sufijo_comp;
+
+            // Período Actual
+            if (isset($todas_las_tablas[$tabla_act])) {
+                try {
+                    $where_global = "WHERE `Ciclo` IS NOT NULL AND `Ciclo` != '' AND `Agencia` IS NOT NULL AND `Agencia` != ''";
+                    $params_global = [];
+                    if ($anomalia === 'cargas_directas') {
+                        $where_global .= " AND `Zona` IN ('1', '01')";
+                    } else {
+                        if ($filtro_zona !== '') {
+                            $where_global .= " AND `Zona` IN (?, ?)";
+                            $params_global[] = (string)(int)$filtro_zona;
+                            $params_global[] = str_pad((int)$filtro_zona, 2, '0', STR_PAD_LEFT);
+                        }
+                    }
+                    $where_global .= " AND NOT (`Zona` IN ('1', '01') AND (`Agencia` IN ('F', 'MOTUL', 'f', 'motul')))";
+
+                    $stmt = $pdo->prepare("SELECT UPPER(TRIM(`Agencia`)) as ag, `Ciclo`, COUNT(*) as cnt FROM `$tabla_act` $where_global GROUP BY UPPER(TRIM(`Agencia`)), `Ciclo`");
+                    $stmt->execute($params_global);
+                    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        $counts_actual_por_agencia[$anomalia][$r['ag']][(int)trim($r['Ciclo'])] = (int)$r['cnt'];
+                    }
+                } catch (PDOException $e) {}
+            }
+
+            // Período Comparación
+            if (isset($todas_las_tablas[$tabla_comp])) {
+                try {
+                    $where_global = "WHERE `Ciclo` IS NOT NULL AND `Ciclo` != '' AND `Agencia` IS NOT NULL AND `Agencia` != ''";
+                    $params_global = [];
+                    if ($anomalia === 'cargas_directas') {
+                        $where_global .= " AND `Zona` IN ('1', '01')";
+                    } else {
+                        if ($filtro_zona !== '') {
+                            $where_global .= " AND `Zona` IN (?, ?)";
+                            $params_global[] = (string)(int)$filtro_zona;
+                            $params_global[] = str_pad((int)$filtro_zona, 2, '0', STR_PAD_LEFT);
+                        }
+                    }
+                    $where_global .= " AND NOT (`Zona` IN ('1', '01') AND (`Agencia` IN ('F', 'MOTUL', 'f', 'motul')))";
+
+                    $stmt = $pdo->prepare("SELECT UPPER(TRIM(`Agencia`)) as ag, `Ciclo`, COUNT(*) as cnt FROM `$tabla_comp` $where_global GROUP BY UPPER(TRIM(`Agencia`)), `Ciclo`");
+                    $stmt->execute($params_global);
+                    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        $counts_comp_por_agencia[$anomalia][$r['ag']][(int)trim($r['Ciclo'])] = (int)$r['cnt'];
+                    }
+                } catch (PDOException $e) {}
+            }
+        }
+
         foreach ($mapa_agencias as $letra_ag => $nombre_ag) {
             $ranking_por_agencia_y_opcion[$letra_ag] = [
                 'nombre' => $nombre_ag,
@@ -596,58 +678,16 @@ if ($busqueda_activa) {
             ];
             
             $diffs_agencia = [];
+            $letra_ag_upper = strtoupper(trim($letra_ag));
             
             foreach ($anomalias as $anomalia) {
                 $diffs_agencia[$anomalia] = [];
-                $tabla_act  = $anomalia . $sufijo_actual;
-                $tabla_comp = $anomalia . $sufijo_comp;
-                if (!isset($todas_las_tablas[$tabla_act])) continue;
                 
-                try {
-                    $where_a = "WHERE `Ciclo` IS NOT NULL AND `Ciclo` != '' AND UPPER(TRIM(`Agencia`)) = ?";
-                    $params_a = [$letra_ag];
-                    if ($anomalia === 'cargas_directas') {
-                        $where_a .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = 1";
-                    } else {
-                        if ($filtro_zona !== '') {
-                            $where_a .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
-                            $params_a[] = (int)$filtro_zona;
-                        }
-                    }
-                    $where_a .= " AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))";
-                    $stmt_a = $pdo->prepare("SELECT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c, COUNT(*) as cnt FROM `$tabla_act` $where_a GROUP BY TRIM(`Ciclo`)");
-                    $stmt_a->execute($params_a);
-                    $ag_actual = [];
-                    while ($r = $stmt_a->fetch(PDO::FETCH_ASSOC)) {
-                        $ag_actual[(int)$r['c']] = (int)$r['cnt'];
-                    }
-
-                    $ag_comp = [];
-                    if (isset($todas_las_tablas[$tabla_comp])) {
-                        $where_c = "WHERE `Ciclo` IS NOT NULL AND `Ciclo` != '' AND UPPER(TRIM(`Agencia`)) = ?";
-                        $params_c = [$letra_ag];
-                        if ($anomalia === 'cargas_directas') {
-                            $where_c .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = 1";
-                        } else {
-                            if ($filtro_zona !== '') {
-                                $where_c .= " AND CAST(TRIM(`Zona`) AS UNSIGNED) = ?";
-                                $params_c[] = (int)$filtro_zona;
-                            }
-                        }
-                        $where_c .= " AND NOT (CAST(TRIM(`Zona`) AS UNSIGNED) = 1 AND (UPPER(TRIM(`Agencia`)) = 'F' OR UPPER(TRIM(`Agencia`)) = 'MOTUL'))";
-                        $stmt_c = $pdo->prepare("SELECT CAST(TRIM(`Ciclo`) AS UNSIGNED) as c, COUNT(*) as cnt FROM `$tabla_comp` $where_c GROUP BY TRIM(`Ciclo`)");
-                        $stmt_c->execute($params_c);
-                        while ($r = $stmt_c->fetch(PDO::FETCH_ASSOC)) {
-                            $ag_comp[(int)$r['c']] = (int)$r['cnt'];
-                        }
-                    }
-                    
-                    foreach ($ciclos_actuales as $c) {
-                        $act_val  = isset($ag_actual[$c])  ? $ag_actual[$c]  : 0;
-                        $comp_val = isset($ag_comp[$c])    ? $ag_comp[$c]    : 0;
-                        $diffs_agencia[$anomalia][$c] = $act_val - $comp_val;
-                    }
-                } catch (PDOException $e) {}
+                foreach ($ciclos_actuales as $c) {
+                    $act_val  = isset($counts_actual_por_agencia[$anomalia][$letra_ag_upper][$c]) ? $counts_actual_por_agencia[$anomalia][$letra_ag_upper][$c] : 0;
+                    $comp_val = isset($counts_comp_por_agencia[$anomalia][$letra_ag_upper][$c]) ? $counts_comp_por_agencia[$anomalia][$letra_ag_upper][$c] : 0;
+                    $diffs_agencia[$anomalia][$c] = $act_val - $comp_val;
+                }
             }
             
             // 1. Opción "default" (excluye 'estimaciones' y 'consumos_cero')
@@ -795,7 +835,7 @@ function getHeatmapStyle($value, $max_pos, $max_neg = null) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/webp" href="../assets/multimedia/logoconfondo.webp">
+    <link rel="icon" type="image/webp" href="../assets/multimedia/logo_cf.webp">
     <title>Comparación de Anomalías</title>
     <link rel="stylesheet" href="../assets/estilos.css">
     <link rel="stylesheet" href="../assets/preparar_analisis.css">

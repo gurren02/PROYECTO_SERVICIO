@@ -148,7 +148,7 @@ $total_ms = round((microtime(true) - $ini) * 1000);
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<link rel="icon" type="image/png" href="assets/multimedia/icon_bluebg.png">
+<link rel="icon" type="image/png" href="assets/multimedia/icon_b.png">
 <title>Diagnóstico de Rendimiento</title>
 <style>
     body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; margin: 0; padding: 20px; color: #1e293b; }

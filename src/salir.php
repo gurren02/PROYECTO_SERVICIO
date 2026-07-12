@@ -8,12 +8,7 @@ session_unset();
 // 3. Destruir la sesión completamente del servidor
 session_destroy();
 
-// 4. Mostrar alerta y redirigir
-echo'
-    <script>
-    alert("CERRASTE SESIÓN CORRECTAMENTE");
-    location.href = "../view/login.php"
-    </script>
-    ';
+// 4. Redirigir al login con parámetro para mostrar aviso personalizado (sin alert del navegador)
+header("Location: ../view/login.php?logout=1");
+exit();
 ?>
-
